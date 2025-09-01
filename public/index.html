@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+  <title>turkkedy.net • Cats</title>
+  <meta name="description" content="endless cats on turkkedy.net" />
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://turkkedy.net/" />
+  <meta property="og:title" content="turkkedy.net • Cats" />
+  <meta property="og:description" content="endless cats on turkkedy.net" />
+  <meta property="og:image" content="https://medias.turkkedy.net/cats/00001.webp" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:site_name" content="turkkedy.net" />
+  
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image" />
+  <meta property="twitter:url" content="https://turkkedy.net/" />
+  <meta property="twitter:title" content="turkkedy.net • Cats" />
+  <meta property="twitter:description" content="endless cats on turkkedy.net" />
+  <meta property="twitter:image" content="https://medias.turkkedy.net/cats/00001.webp" />
+  
+  <style>
+    :root { --bg:#0f1115; --fg:#e6e6e6; --muted:#9aa0a6; --btn:#1f232b; --btnh:#2a2f3a; }
+    * { box-sizing: border-box; }
+    html,body { margin:0; height:100%; background:var(--bg); color:var(--fg); font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    
+    /* Mobile-first responsive design */
+    header { 
+      display:flex; 
+      align-items:center; 
+      justify-content:space-between; 
+      padding:10px 14px; 
+      gap:10px; 
+      border-bottom:1px solid #20232a;
+      flex-wrap: wrap;
+      min-height: 60px;
+    }
+    
+    header .count { color:var(--muted); font-size:14px; }
+    
+    main { 
+      height:calc(100% - 60px); 
+      display:flex; 
+      align-items:center; 
+      justify-content:center; 
+      padding:10px;
+      position: relative;
+    }
+    
+    #frame { 
+      max-width:100%; 
+      max-height:100%; 
+      display:block; 
+      border-radius:10px; 
+      box-shadow: 0 10px 30px rgba(0,0,0,.45); 
+      cursor:pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    
+    .toolbar { 
+      display:flex; 
+      gap:8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    
+    button { 
+      background:var(--btn); 
+      color:var(--fg); 
+      border:1px solid #2b2f38; 
+      padding:8px 12px; 
+      border-radius:8px; 
+      cursor:pointer; 
+      font-weight:600;
+      font-size: 14px;
+      min-height: 44px;
+      min-width: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    button:hover { background:var(--btnh); }
+    button:active { transform: scale(0.95); }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    
+    .filename { 
+      font-size:12px; 
+      color:var(--muted); 
+      margin-left:8px; 
+      user-select:all;
+      word-break: break-all;
+      max-width: 200px;
+    }
+    
+    .spacer { flex:1 }
+    
+    /* Mobile optimizations */
+    @media (max-width: 768px) {
+      header {
+        padding: 8px 12px;
+        gap: 6px;
+      }
+      
+      .toolbar {
+        gap: 6px;
+        order: 1;
+        width: 100%;
+        justify-content: center;
+        margin-bottom: 8px;
+      }
+      
+      header .count {
+        order: 2;
+        font-size: 12px;
+      }
+      
+      .filename {
+        order: 3;
+        margin-left: 0;
+        margin-top: 4px;
+        max-width: 100%;
+        text-align: center;
+        font-size: 11px;
+      }
+      
+      button {
+        padding: 10px 14px;
+        font-size: 13px;
+        min-height: 48px;
+        min-width: 48px;
+      }
+      
+      #prevBtn, #nextBtn {
+        min-width: 80px;
+      }
+      
+      main {
+        padding: 8px;
+        height: calc(100% - 120px);
+      }
+      
+      #frame {
+        border-radius: 8px;
+        box-shadow: 0 8px 20px rgba(0,0,0,.4);
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .toolbar {
+        gap: 4px;
+      }
+      
+      button {
+        padding: 8px 10px;
+        font-size: 12px;
+        min-height: 44px;
+        min-width: 44px;
+      }
+      
+      #prevBtn, #nextBtn {
+        min-width: 70px;
+      }
+      
+      #randBtn, #shareBtn {
+        min-width: 44px;
+      }
+      
+      .filename {
+        font-size: 10px;
+      }
+    }
+    
+    /* Touch-friendly interactions */
+    @media (hover: none) and (pointer: coarse) {
+      button:hover {
+        background: var(--btn);
+      }
+      
+      button:active {
+        background: var(--btnh);
+        transform: scale(0.95);
+      }
+    }
+    
+    /* Loading state */
+    .loading {
+      opacity: 0.7;
+      pointer-events: none;
+    }
+    
+    /* Swipe hint */
+    .swipe-hint {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: var(--muted);
+      font-size: 12px;
+      opacity: 0.7;
+      pointer-events: none;
+      animation: fadeInOut 3s ease-in-out infinite;
+    }
+    
+    @keyframes fadeInOut {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 0.7; }
+    }
+    
+    @media (min-width: 769px) {
+      .swipe-hint {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="toolbar">
+      <button id="prevBtn" title="Previous (←)">⟵ Önceki</button>
+      <button id="nextBtn" title="Next (→)">Sonraki ⟶</button>
+      <button id="randBtn" title="Random (R)">🎲 Rastgele</button>
+      <button id="shareBtn" title="Share (S)">🔗 Paylaş</button>
+    </div>
+    <div class="spacer"></div>
+    <div>
+      <span class="count"><span id="currentIdx">0</span>/<span id="total">0</span></span>
+      <span class="filename" id="filename"></span>
+    </div>
+  </header>
+
+  <main>
+    <img id="frame" alt="cat" loading="eager" />
+    <div class="swipe-hint">← Swipe to navigate →</div>
+  </main>
+
+  <script>
+    // --- CONFIG ---
+    const IS_DEV = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    const CDN_BASE = IS_DEV ? '' : 'https://medias.turkkedy.net';           // R2 custom/public domain
+    const MANIFEST_URL = IS_DEV ? '/api/local-manifest' : '/api/manifest';  // Pages Function
+
+    // --- STATE ---
+    let images = [];
+    let index = 0;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let isSwiping = false;
+
+    // --- DOM helpers ---
+    const $ = (id) => document.getElementById(id);
+    const imgEl = $('frame'), totalEl = $('total'), currentEl = $('currentIdx'),
+          fileEl = $('filename'), prevBtn = $('prevBtn'), nextBtn = $('nextBtn'),
+          randBtn = $('randBtn'), shareBtn = $('shareBtn');
+
+    // --- b64url helpers for shareable keys ---
+    function b64urlEncode(str){
+      const bytes = new TextEncoder().encode(str);
+      let b64 = btoa(String.fromCharCode(...bytes));
+      return b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    }
+    function b64urlDecode(s){
+      s = s.replace(/-/g,'+').replace(/_/g,'/');
+      const pad = s.length % 4; if (pad) s += '='.repeat(4-pad);
+      const bytes = Uint8Array.from(atob(s), c => c.charCodeAt(0));
+      return new TextDecoder().decode(bytes);
+    }
+
+    // --- utils ---
+    function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
+    function getSrc(item){ return typeof item === "string" ? item : item.src; }
+    function urlFor(item){
+      const path = getSrc(item).replace(/^\/+/, '');
+      return IS_DEV ? `/${path}` : `${CDN_BASE}/${encodeURI(path)}`;
+    }
+
+    // Read index or shared key from URL
+    function getInitialIndex(){
+      const url = new URL(location.href);
+
+      // If landing with ?k=<base64url(key)>, try to jump to that image
+      const sharedKey = url.searchParams.get('k');
+      if (sharedKey) {
+        try {
+          const realKey = b64urlDecode(sharedKey);
+          const i = images.findIndex(p => getSrc(p) === realKey);
+          if (i >= 0) return i;
+        } catch {}
+      }
+
+      const q = url.searchParams.get('i');
+      if (q !== null) return clamp(parseInt(q,10)||0, 0, images.length-1);
+
+      const h = new URLSearchParams(url.hash.replace(/^#/,''));
+      if (h.has('i')) return clamp(parseInt(h.get('i'),10)||0, 0, images.length-1);
+
+      return 0;
+    }
+
+    // After consuming ?k once, remove it so shares don't accidentally include it
+    function consumeSharedKeyOnce(){
+      const url = new URL(location.href);
+      if (url.searchParams.has('k')) {
+        url.searchParams.delete('k');
+        history.replaceState(null, '', url.toString());
+      }
+    }
+
+    function render(){
+      const item = images[index];
+      const src = urlFor(item);
+      const fname = decodeURIComponent(getSrc(item).split('/').pop());
+
+      // Add loading state
+      imgEl.classList.add('loading');
+      
+      imgEl.onload = () => {
+        imgEl.classList.remove('loading');
+      };
+      
+      imgEl.onerror = () => {
+        imgEl.classList.remove('loading');
+      };
+
+      imgEl.src = src;
+      imgEl.alt = `cat: ${fname}`;
+      currentEl.textContent = index + 1;
+      totalEl.textContent = images.length;
+      fileEl.textContent = fname;
+
+      // Update social media meta tags for current image
+      const fullSrc = IS_DEV ? src : src.replace(/^https:\/\/medias\.turkkedy\.net\//, 'https://medias.turkkedy.net/');
+      updateSocialMetaTags(fullSrc, fname);
+
+      // Preload next
+      const nextIdx = (index + 1) % images.length;
+      const preload = new Image();
+      preload.src = urlFor(images[nextIdx]);
+
+      // Update deep link (?i=)
+      const url = new URL(location.href);
+      url.searchParams.set('i', index);
+      history.replaceState(null, '', url.toString());
+    }
+
+    function updateSocialMetaTags(imageSrc, filename) {
+      // Update Open Graph image
+      const ogImage = document.querySelector('meta[property="og:image"]');
+      if (ogImage) ogImage.setAttribute('content', imageSrc);
+      
+      // Update Twitter image
+      const twitterImage = document.querySelector('meta[property="twitter:image"]');
+      if (twitterImage) twitterImage.setAttribute('content', imageSrc);
+      
+      // Update title and description to include filename
+      const ogTitle = document.querySelector('meta[property="og:title"]');
+      if (ogTitle) ogTitle.setAttribute('content', `turkkedy.net • ${filename}`);
+      
+      const twitterTitle = document.querySelector('meta[property="twitter:title"]');
+      if (twitterTitle) twitterTitle.setAttribute('content', `turkkedy.net • ${filename}`);
+    }
+
+    function next(){ index = (index + 1) % images.length; render(); }
+    function prev(){ index = (index - 1 + images.length) % images.length; render(); }
+    function random(){
+      if (images.length <= 1) return;
+      let r = Math.floor(Math.random() * images.length);
+      if (r === index) r = (r + 1) % images.length;
+      index = r; render();
+    }
+
+    // Current image key (handles initial ?k= case, falls back to manifest item)
+    function getCurrentKey(){
+      const url = new URL(location.href);
+      const k = url.searchParams.get('k');
+      if (k) { try { return b64urlDecode(k); } catch {} }
+      const item = images[index];
+      return item ? getSrc(item) : null;
+    }
+
+    // Build a share URL that unfurls with an image preview via /p/<key>
+    function buildShareURL(){
+      const key = getCurrentKey();
+      if (!key) return location.href; // fallback
+      const enc = b64urlEncode(key);
+      return `${location.origin}/p/${enc}`; // NOTE: no ?k= on /p links
+    }
+
+    async function share(){
+      const shareUrl = buildShareURL();
+      const title = 'turkkedy.net • cat';
+      try {
+        if (navigator.share) {
+          await navigator.share({ title, url: shareUrl });
+        } else {
+          await navigator.clipboard.writeText(shareUrl);
+          shareBtn.textContent = '✔ Kopyalandı';
+          setTimeout(() => (shareBtn.textContent = '🔗 Paylaş'), 1200);
+        }
+      } catch {
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          shareBtn.textContent = '✔ Kopyalandı';
+          setTimeout(() => (shareBtn.textContent = '🔗 Paylaş'), 1200);
+        } catch {}
+      }
+    }
+
+    // Touch/swipe handling
+    function handleTouchStart(e) {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      isSwiping = false;
+    }
+
+    function handleTouchMove(e) {
+      if (!touchStartX || !touchStartY) return;
+      
+      const touchEndX = e.touches[0].clientX;
+      const touchEndY = e.touches[0].clientY;
+      
+      const diffX = touchStartX - touchEndX;
+      const diffY = touchStartY - touchEndY;
+      
+      // Check if it's a horizontal swipe (more horizontal than vertical)
+      if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+        isSwiping = true;
+        e.preventDefault();
+      }
+    }
+
+    function handleTouchEnd(e) {
+      if (!isSwiping) return;
+      
+      const touchEndX = e.changedTouches[0].clientX;
+      const diffX = touchStartX - touchEndX;
+      
+      if (Math.abs(diffX) > 50) {
+        if (diffX > 0) {
+          next(); // Swipe left
+        } else {
+          prev(); // Swipe right
+        }
+      }
+      
+      touchStartX = 0;
+      touchStartY = 0;
+      isSwiping = false;
+    }
+
+    // Shortcuts & clicks
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') next();
+      else if (e.key === 'ArrowLeft') prev();
+      else if (e.key.toLowerCase() === 'r') random();
+      else if (e.key.toLowerCase() === 's') share();
+    });
+    
+    // Touch events
+    imgEl.addEventListener('touchstart', handleTouchStart, { passive: false });
+    imgEl.addEventListener('touchmove', handleTouchMove, { passive: false });
+    imgEl.addEventListener('touchend', handleTouchEnd, { passive: true });
+    
+    imgEl.onclick = next;
+    prevBtn.onclick = prev; nextBtn.onclick = next;
+    randBtn.onclick = random; shareBtn.onclick = share;
+
+    // Init
+    (async function init(){
+      try {
+        const res = await fetch(MANIFEST_URL, { cache: 'no-store' });
+        images = await res.json();
+        if (!Array.isArray(images) || images.length === 0) throw new Error('No images found');
+
+        index = getInitialIndex();
+        consumeSharedKeyOnce();   // strip ?k= after using it
+        render();
+      } catch (e) {
+        document.body.innerHTML = '<p style="padding:20px;color:#f66">Failed to load images. Check R2 public access and the /api/manifest function.</p>';
+        console.error(e);
+      }
+    })();
+  </script>
+</body>
+</html>

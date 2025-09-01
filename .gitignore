@@ -1,0 +1,13 @@
+cats/
+output/
+manifest.json
+.DS_Store
+.env
+
+.wrangler/
+input/
+node_modules/
+.vscode/
+
+Cats.00000.7z
+Cats.00001.7z
