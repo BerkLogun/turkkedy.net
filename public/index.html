@@ -65,7 +65,7 @@
 
     .preview-container { position: relative; margin: 20px 0; text-align: center; }
     .preview-image { max-width: 100%; max-height: 360px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-    .overlay-canvas { position:absolute; inset:0; margin:auto; border-radius: 8px; pointer-events:none; }
+    .overlay-canvas { position:absolute; top:0; left:0; border-radius: 8px; pointer-events:none; }
 
     .detection-results { margin: 15px 0; padding: 15px; background: rgba(255,255,255,0.05); border-radius: 8px; border-left: 4px solid var(--ok); }
     .detection-results.low-confidence { border-left-color: var(--warn); }
@@ -244,51 +244,78 @@
       return model;
     }
 
-    // --- Canvas overlay helpers ---
     function fitOverlayToImage() {
-      // Match canvas size to the currently rendered preview image box
-      const rect = previewImage.getBoundingClientRect();
-      overlayCanvas.width = Math.max(1, Math.floor(rect.width));
-      overlayCanvas.height = Math.max(1, Math.floor(rect.height));
-      overlayCanvas.style.width = rect.width + 'px';
-      overlayCanvas.style.height = rect.height + 'px';
+      const imgRect = previewImage.getBoundingClientRect();
+      const containerRect = previewImage.parentElement.getBoundingClientRect();
+
+      const left = imgRect.left - containerRect.left;
+      const top  = imgRect.top  - containerRect.top;
+
+      const dpr = window.devicePixelRatio || 1;
+
+      // Position the overlay exactly over the rendered image
+      overlayCanvas.style.left = left + 'px';
+      overlayCanvas.style.top  = top  + 'px';
+      overlayCanvas.style.width  = imgRect.width  + 'px';
+      overlayCanvas.style.height = imgRect.height + 'px';
+
+      // Backing store size in device pixels for crisp lines
+      overlayCanvas.width  = Math.max(1, Math.round(imgRect.width  * dpr));
+      overlayCanvas.height = Math.max(1, Math.round(imgRect.height * dpr));
+
+      // Draw in CSS pixel coordinates
+      const ctx = overlayCanvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
     function drawBoxes(preds) {
       const ctx = overlayCanvas.getContext('2d');
-      ctx.clearRect(0,0,overlayCanvas.width, overlayCanvas.height);
+      ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
       if (!preds || !preds.length) return;
 
-      // scale from natural image size to current canvas size
-      const sx = overlayCanvas.width / previewImage.naturalWidth;
-      const sy = overlayCanvas.height / previewImage.naturalHeight;
+      // Rendered size (target space)
+      const imgRect = previewImage.getBoundingClientRect();
+      const targetW = imgRect.width;
+      const targetH = imgRect.height;
+
+      // Source size (what detect() used)
+      // Prefer layout size if present, else fall back to natural.
+      // (For <img>, .width/.height reflect the rendered CSS size when not set as attributes.)
+      const srcW = previewImage.width  || previewImage.naturalWidth;
+      const srcH = previewImage.height || previewImage.naturalHeight;
+
+      const sx = targetW / srcW;
+      const sy = targetH / srcH;
 
       preds.forEach(p => {
         if (p.class !== 'cat') return;
-        const [x,y,w,h] = p.bbox;
-        const rx = x * sx, ry = y * sy, rw = w * sx, rh = h * sy;
+        const [x, y, w, h] = p.bbox;
+
+        const rx = x * sx;
+        const ry = y * sy;
+        const rw = w * sx;
+        const rh = h * sy;
 
         // box
         ctx.lineWidth = 3;
         ctx.strokeStyle = 'rgba(6,214,160,0.95)';
         ctx.strokeRect(rx, ry, rw, rh);
 
-        // label background
-        const label = `🐱 ${(p.score*100).toFixed(1)}%`;
+        // label
+        const label = `🐱 ${(p.score * 100).toFixed(1)}%`;
         ctx.font = 'bold 14px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif';
         const pad = 6;
-        const tw = ctx.measureText(label).width + pad*2;
+        const tw = ctx.measureText(label).width + pad * 2;
         const th = 20;
         ctx.fillStyle = 'rgba(6,214,160,0.95)';
         ctx.fillRect(rx - 1, Math.max(ry - th, 0), tw, th);
-
-        // label text
         ctx.fillStyle = '#0f1115';
         ctx.textBaseline = 'top';
         ctx.fillText(label, rx - 1 + pad, Math.max(ry - th, 0) + 3);
       });
     }
+
 
     // --- Cat Detection ---
     async function detectCat(imageElement) {
