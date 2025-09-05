@@ -5,11 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
   <title>turkkedy.net • Cats</title>
   <meta name="description" content="endless cats on turkkedy.net" />
-  
-  <!-- TensorFlow.js for object detection -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
-  
+
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://turkkedy.net/" />
@@ -19,491 +15,442 @@
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:site_name" content="turkkedy.net" />
-  
+
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image" />
   <meta property="twitter:url" content="https://turkkedy.net/" />
   <meta property="twitter:title" content="turkkedy.net • Cats" />
   <meta property="twitter:description" content="endless cats on turkkedy.net" />
   <meta property="twitter:image" content="https://medias.turkkedy.net/cats/00001.webp" />
-  
+
+  <!-- TensorFlow.js and COCO-SSD (defer load); add WASM backend for wider device support -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.15.0/dist/tf-backend-wasm.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js" defer></script>
+
   <style>
-    :root { --bg:#0f1115; --fg:#e6e6e6; --muted:#9aa0a6; --btn:#1f232b; --btnh:#2a2f3a; }
+    :root { --bg:#0f1115; --fg:#e6e6e6; --muted:#9aa0a6; --btn:#1f232b; --btnh:#2a2f3a; --ok:#06d6a0; --warn:#ffd166; --err:#f77f00; }
     * { box-sizing: border-box; }
     html,body { margin:0; height:100%; background:var(--bg); color:var(--fg); font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-    
-    /* Mobile-first responsive design */
-    header { 
-      display:flex; 
-      align-items:center; 
-      justify-content:space-between; 
-      padding:10px 14px; 
-      gap:10px; 
-      border-bottom:1px solid #20232a;
-      flex-wrap: wrap;
-      min-height: 60px;
-    }
-    
+    header { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; gap:10px; border-bottom:1px solid #20232a; flex-wrap: wrap; min-height: 60px; }
     header .count { color:var(--muted); font-size:14px; }
-    
-    main { 
-      height:calc(100% - 60px); 
-      display:flex; 
-      align-items:center; 
-      justify-content:center; 
-      padding:10px;
-      position: relative;
-    }
-    
-    #frame { 
-      max-width:100%; 
-      max-height:100%; 
-      display:block; 
-      border-radius:10px; 
-      box-shadow: 0 10px 30px rgba(0,0,0,.45); 
-      cursor:pointer;
-      user-select: none;
-      -webkit-user-select: none;
-      -webkit-touch-callout: none;
-    }
-    
-    .toolbar { 
-      display:flex; 
-      gap:8px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-    
-    button { 
-      background:var(--btn); 
-      color:var(--fg); 
-      border:1px solid #2b2f38; 
-      padding:8px 12px; 
-      border-radius:8px; 
-      cursor:pointer; 
-      font-weight:600;
-      font-size: 14px;
-      min-height: 44px;
-      min-width: 44px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.2s ease;
-      -webkit-tap-highlight-color: transparent;
-    }
-    
+    main { height:calc(100% - 60px); display:flex; align-items:center; justify-content:center; padding:10px; position: relative; }
+    #frame { max-width:100%; max-height:100%; display:block; border-radius:10px; box-shadow: 0 10px 30px rgba(0,0,0,.45); cursor:pointer; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+    .toolbar { display:flex; gap:8px; flex-wrap: wrap; align-items: center; }
+    button { background:var(--btn); color:var(--fg); border:1px solid #2b2f38; padding:8px 12px; border-radius:8px; cursor:pointer; font-weight:600; font-size: 14px; min-height: 44px; min-width: 44px; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; -webkit-tap-highlight-color: transparent; }
     button:hover { background:var(--btnh); }
     button:active { transform: scale(0.95); }
     button:disabled { opacity:.5; cursor:not-allowed; }
-    
-    .filename { 
-      font-size:12px; 
-      color:var(--muted); 
-      margin-left:8px; 
-      user-select:all;
-      word-break: break-all;
-      max-width: 200px;
-    }
-    
+    .filename { font-size:12px; color:var(--muted); margin-left:8px; user-select:all; word-break: break-all; max-width: 200px; }
     .spacer { flex:1 }
-    
-    /* Mobile optimizations */
-    @media (max-width: 768px) {
-      header {
-        padding: 8px 12px;
-        gap: 6px;
-      }
-      
-      .toolbar {
-        gap: 6px;
-        order: 1;
-        width: 100%;
-        justify-content: center;
-        margin-bottom: 8px;
-      }
-      
-      header .count {
-        order: 2;
-        font-size: 12px;
-      }
-      
-      .filename {
-        order: 3;
-        margin-left: 0;
-        margin-top: 4px;
-        max-width: 100%;
-        text-align: center;
-        font-size: 11px;
-      }
-      
-      button {
-        padding: 10px 14px;
-        font-size: 13px;
-        min-height: 48px;
-        min-width: 48px;
-      }
-      
-      #prevBtn, #nextBtn {
-        min-width: 80px;
-      }
-      
-      main {
-        padding: 8px;
-        height: calc(100% - 120px);
-      }
-      
-      #frame {
-        border-radius: 8px;
-        box-shadow: 0 8px 20px rgba(0,0,0,.4);
-      }
-    }
-    
-    @media (max-width: 480px) {
-      .toolbar {
-        gap: 4px;
-      }
-      
-      button {
-        padding: 8px 10px;
-        font-size: 12px;
-        min-height: 44px;
-        min-width: 44px;
-      }
-      
-      #prevBtn, #nextBtn {
-        min-width: 70px;
-      }
-      
-      #randBtn, #shareBtn {
-        min-width: 44px;
-      }
-      
-      .filename {
-        font-size: 10px;
-      }
-    }
-    
-    /* Touch-friendly interactions */
-    @media (hover: none) and (pointer: coarse) {
-      button:hover {
-        background: var(--btn);
-      }
-      
-      button:active {
-        background: var(--btnh);
-        transform: scale(0.95);
-      }
-    }
-    
-    /* Loading state */
-    .loading {
-      opacity: 0.7;
-      pointer-events: none;
-    }
-    
-    /* Swipe hint */
-    .swipe-hint {
-      position: absolute;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      color: var(--muted);
-      font-size: 12px;
-      opacity: 0.7;
-      pointer-events: none;
-      animation: fadeInOut 3s ease-in-out infinite;
-    }
-    
-    @keyframes fadeInOut {
-      0%, 100% { opacity: 0.3; }
-      50% { opacity: 0.7; }
-    }
-    
-    @media (min-width: 769px) {
-      .swipe-hint {
-        display: none;
-      }
-    }
-    
+    .loading { opacity: 0.7; pointer-events: none; }
+    .swipe-hint { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: var(--muted); font-size: 12px; opacity: 0.7; pointer-events: none; animation: fadeInOut 3s ease-in-out infinite; }
+    @keyframes fadeInOut { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.7; } }
+    @media (min-width: 769px) { .swipe-hint { display: none; } }
+
     /* Upload Modal Styles */
-    .modal {
-      display: none;
-      position: fixed;
-      z-index: 1000;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0,0,0,0.8);
-      backdrop-filter: blur(4px);
-    }
-    
-    .modal-content {
-      background: var(--bg);
-      margin: 5% auto;
-      padding: 20px;
-      border: 1px solid #2b2f38;
-      border-radius: 12px;
-      width: 90%;
-      max-width: 500px;
-      max-height: 80vh;
-      overflow-y: auto;
-      position: relative;
-    }
-    
-    .modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid #2b2f38;
-    }
-    
-    .modal-title {
-      font-size: 18px;
-      font-weight: 600;
-      color: var(--fg);
-    }
-    
-    .close {
-      color: var(--muted);
-      font-size: 28px;
-      font-weight: bold;
-      cursor: pointer;
-      line-height: 1;
-    }
-    
-    .close:hover {
-      color: var(--fg);
-    }
-    
-    .upload-area {
-      border: 2px dashed #2b2f38;
-      border-radius: 8px;
-      padding: 40px 20px;
-      text-align: center;
-      margin-bottom: 20px;
-      transition: all 0.3s ease;
-      cursor: pointer;
-    }
-    
-    .upload-area:hover {
-      border-color: var(--muted);
-      background: rgba(255,255,255,0.02);
-    }
-    
-    .upload-area.dragover {
-      border-color: #06d6a0;
-      background: rgba(6,214,160,0.1);
-    }
-    
-    .upload-icon {
-      font-size: 48px;
-      margin-bottom: 10px;
-      opacity: 0.7;
-    }
-    
-    .upload-text {
-      color: var(--muted);
-      margin-bottom: 10px;
-    }
-    
-    .upload-hint {
-      font-size: 12px;
-      color: var(--muted);
-      opacity: 0.8;
-    }
-    
-    .file-input {
-      display: none;
-    }
-    
-    .preview-container {
-      margin: 20px 0;
-      text-align: center;
-    }
-    
-    .preview-image {
-      max-width: 100%;
-      max-height: 300px;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    }
-    
-    .detection-results {
-      margin: 15px 0;
-      padding: 15px;
-      background: rgba(255,255,255,0.05);
-      border-radius: 8px;
-      border-left: 4px solid #06d6a0;
-    }
-    
-    .detection-results.low-confidence {
-      border-left-color: #ffd166;
-    }
-    
-    .detection-results.no-cat {
-      border-left-color: #f77f00;
-    }
-    
-    .confidence-score {
-      font-weight: 600;
-      margin-bottom: 5px;
-    }
-    
-    .confidence-high { color: #06d6a0; }
-    .confidence-medium { color: #ffd166; }
-    .confidence-low { color: #f77f00; }
-    
-    .upload-status {
-      margin: 15px 0;
-      padding: 10px;
-      border-radius: 6px;
-      text-align: center;
-      font-weight: 500;
-    }
-    
-    .upload-status.uploading {
-      background: rgba(6,214,160,0.2);
-      color: #06d6a0;
-    }
-    
-    .upload-status.success {
-      background: rgba(6,214,160,0.2);
-      color: #06d6a0;
-    }
-    
-    .upload-status.error {
-      background: rgba(247,127,0,0.2);
-      color: #f77f00;
-    }
-    
-    .modal-actions {
-      display: flex;
-      gap: 10px;
-      justify-content: flex-end;
-      margin-top: 20px;
-    }
-    
-    .modal-actions button {
-      min-width: 100px;
-    }
-    
+    .modal { display: none; position: fixed; z-index: 1000; inset: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); backdrop-filter: blur(4px); }
+    .modal-content { background: var(--bg); margin: 5% auto; padding: 20px; border: 1px solid #2b2f38; border-radius: 12px; width: 90%; max-width: 560px; max-height: 80vh; overflow-y: auto; position: relative; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #2b2f38; }
+    .modal-title { font-size: 18px; font-weight: 600; color: var(--fg); }
+    .close { color: var(--muted); font-size: 28px; font-weight: bold; cursor: pointer; line-height: 1; }
+    .close:hover { color: var(--fg); }
+    .upload-area { border: 2px dashed #2b2f38; border-radius: 8px; padding: 40px 20px; text-align: center; margin-bottom: 20px; transition: all 0.3s ease; cursor: pointer; }
+    .upload-area:hover { border-color: var(--muted); background: rgba(255,255,255,0.02); }
+    .upload-area.dragover { border-color: var(--ok); background: rgba(6,214,160,0.1); }
+    .upload-icon { font-size: 48px; margin-bottom: 10px; opacity: 0.7; }
+    .upload-text { color: var(--muted); margin-bottom: 10px; }
+    .upload-hint { font-size: 12px; color: var(--muted); opacity: 0.8; }
+    .file-input { display: none; }
+
+    .preview-container { position: relative; margin: 20px 0; text-align: center; }
+    .preview-image { max-width: 100%; max-height: 360px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .overlay-canvas { position:absolute; inset:0; margin:auto; border-radius: 8px; pointer-events:none; }
+
+    .detection-results { margin: 15px 0; padding: 15px; background: rgba(255,255,255,0.05); border-radius: 8px; border-left: 4px solid var(--ok); }
+    .detection-results.low-confidence { border-left-color: var(--warn); }
+    .detection-results.no-cat { border-left-color: var(--err); }
+    .confidence-score { font-weight: 600; margin-bottom: 5px; }
+    .confidence-high { color: var(--ok); }
+    .confidence-medium { color: var(--warn); }
+    .confidence-low { color: var(--err); }
+
+    .upload-status { margin: 15px 0; padding: 10px; border-radius: 6px; text-align: center; font-weight: 500; }
+    .upload-status.uploading, .upload-status.success { background: rgba(6,214,160,0.2); color: var(--ok); }
+    .upload-status.error { background: rgba(247,127,0,0.2); color: var(--err); }
+
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+    .modal-actions button { min-width: 120px; }
+
+    /* Mobile */
     @media (max-width: 768px) {
-      .modal-content {
-        margin: 10% auto;
-        width: 95%;
-        padding: 15px;
-      }
-      
-      .upload-area {
-        padding: 30px 15px;
-      }
-      
-      .upload-icon {
-        font-size: 36px;
-      }
-      
-      .modal-actions {
-        flex-direction: column;
-      }
-      
-      .modal-actions button {
-        width: 100%;
-      }
+      header { padding: 8px 12px; gap: 6px; }
+      .toolbar { gap: 6px; order: 1; width: 100%; justify-content: center; margin-bottom: 8px; }
+      header .count { order: 2; font-size: 12px; }
+      .filename { order: 3; margin-left: 0; margin-top: 4px; max-width: 100%; text-align: center; font-size: 11px; }
+      button { padding: 10px 14px; font-size: 13px; min-height: 48px; min-width: 48px; }
+      #prevBtn, #nextBtn { min-width: 80px; }
+      main { padding: 8px; height: calc(100% - 120px); }
+      #frame { border-radius: 8px; box-shadow: 0 8px 20px rgba(0,0,0,.4); }
+      .modal-actions { flex-direction: column; }
+      .modal-actions button { width: 100%; }
+    }
+    @media (max-width: 480px) {
+      .toolbar { gap: 4px; }
+      button { padding: 8px 10px; font-size: 12px; min-height: 44px; min-width: 44px; }
+      #prevBtn, #nextBtn { min-width: 70px; }
+      #randBtn, #shareBtn { min-width: 44px; }
+      .filename { font-size: 10px; }
     }
   </style>
 </head>
 <body>
   <header>
-    <div class="toolbar">
-      <button id="prevBtn" title="Previous (←)">⟵ Önceki</button>
-      <button id="nextBtn" title="Next (→)">Sonraki ⟶</button>
-      <button id="randBtn" title="Random (R)">🎲 Rastgele</button>
-      <button id="shareBtn" title="Share (S)">🔗 Paylaş</button>
-      <button id="uploadBtn" title="Upload Cat Photo">📸 Kedi Yükle</button>
+    <div class="toolbar" role="toolbar" aria-label="Gezinme">
+      <button id="prevBtn" title="Previous (←)" aria-label="Önceki">⟵ Önceki</button>
+      <button id="nextBtn" title="Next (→)" aria-label="Sonraki">Sonraki ⟶</button>
+      <button id="randBtn" title="Random (R)" aria-label="Rastgele">🎲 Rastgele</button>
+      <button id="shareBtn" title="Share (S)" aria-label="Paylaş">🔗 Paylaş</button>
+      <button id="uploadBtn" title="Upload Cat Photo" aria-haspopup="dialog" aria-controls="uploadModal">📸 Kedi Yükle</button>
     </div>
     <div class="spacer"></div>
     <div>
-      <span class="count"><span id="currentIdx">0</span>/<span id="total">0</span></span>
+      <span class="count" aria-live="polite"><span id="currentIdx">0</span>/<span id="total">0</span></span>
       <span class="filename" id="filename"></span>
     </div>
   </header>
 
   <main>
     <img id="frame" alt="cat" loading="eager" />
-    <div class="swipe-hint">← Swipe to navigate →</div>
+    <div class="swipe-hint">← Gezinmek için kaydırın →</div>
   </main>
 
   <!-- Upload Modal -->
-  <div id="uploadModal" class="modal">
+  <div id="uploadModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 class="modal-title">🐱 Kedi Fotoğrafı Yükle</h3>
-        <span class="close" id="closeModal">&times;</span>
+        <h3 id="modalTitle" class="modal-title">🐱 Kedi Fotoğrafı Yükle</h3>
+        <span class="close" id="closeModal" role="button" tabindex="0" aria-label="Kapat">&times;</span>
       </div>
-      
-      <div class="upload-area" id="uploadArea">
+
+      <div class="upload-area" id="uploadArea" aria-label="Yükleme alanı" tabindex="0">
         <div class="upload-icon">📸</div>
         <div class="upload-text">Fotoğrafı buraya sürükleyin veya tıklayın</div>
         <div class="upload-hint">JPG, PNG, WebP formatları desteklenir</div>
         <input type="file" id="fileInput" class="file-input" accept="image/*" />
       </div>
-      
-      <div id="previewContainer" class="preview-container" style="display: none;">
-        <img id="previewImage" class="preview-image" alt="Preview" />
+
+      <div id="previewContainer" class="preview-container" style="display:none;">
+        <img id="previewImage" class="preview-image" alt="Önizleme" />
+        <canvas id="overlayCanvas" class="overlay-canvas"></canvas>
       </div>
-      
-      <div id="detectionResults" class="detection-results" style="display: none;">
+
+      <div id="detectionResults" class="detection-results" style="display:none;">
         <div id="confidenceScore" class="confidence-score"></div>
         <div id="detectionMessage"></div>
       </div>
-      
-      <div id="uploadStatus" class="upload-status" style="display: none;"></div>
-      
+
+      <div id="uploadStatus" class="upload-status" style="display:none;" aria-live="polite"></div>
+
       <div class="modal-actions">
         <button id="cancelUpload" type="button">İptal</button>
-        <button id="submitUpload" type="button" style="display: none;">Yükle</button>
+        <button id="submitUpload" type="button" style="display:none;">Yükle</button>
       </div>
     </div>
   </div>
 
   <script>
+  // Wait for libraries to be ready before our logic runs
+  window.addEventListener('DOMContentLoaded', () => {
     // --- CONFIG ---
     const IS_DEV = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-    const CDN_BASE = IS_DEV ? '' : 'https://medias.turkkedy.net';           // R2 custom/public domain
-    const MANIFEST_URL = IS_DEV ? '/api/local-manifest' : '/api/manifest';  // Pages Function
-    const UPLOAD_URL = '/api/upload';  // Upload endpoint
-    const CAT_CONFIDENCE_THRESHOLD = 0.7;  // Minimum confidence for auto-approval
+    const CDN_BASE = IS_DEV ? '' : 'https://medias.turkkedy.net';
+    const MANIFEST_URL = IS_DEV ? '/api/local-manifest' : '/api/manifest';
+    const UPLOAD_URL = '/api/upload';
+
+    // Cat detection thresholds (tuned for fewer false negatives)
+    const CAT_CONFIDENCE_AUTO = 0.80;     // otomatik onay
+    const CAT_CONFIDENCE_MIN  = 0.40;     // "kedi olabilir" alt sınır
+    const COCO_MIN_SCORE      = 0.20;     // model.detect minScore
+    const COCO_MAX_BOXES      = 10;
 
     // --- STATE ---
     let images = [];
     let index = 0;
-    let touchStartX = 0;
-    let touchStartY = 0;
-    let isSwiping = false;
-    
+    let touchStartX = 0, touchStartY = 0, isSwiping = false;
+
     // Upload state
     let model = null;
     let selectedFile = null;
     let detectionResult = null;
+    let detectRunToken = 0;          // cancel/race protection
+    let tfBackendReady = false;
 
     // --- DOM helpers ---
     const $ = (id) => document.getElementById(id);
     const imgEl = $('frame'), totalEl = $('total'), currentEl = $('currentIdx'),
           fileEl = $('filename'), prevBtn = $('prevBtn'), nextBtn = $('nextBtn'),
           randBtn = $('randBtn'), shareBtn = $('shareBtn'), uploadBtn = $('uploadBtn');
-    
-    // Upload modal elements
+
     const uploadModal = $('uploadModal'), closeModal = $('closeModal'),
           uploadArea = $('uploadArea'), fileInput = $('fileInput'),
           previewContainer = $('previewContainer'), previewImage = $('previewImage'),
+          overlayCanvas = $('overlayCanvas'),
           detectionResults = $('detectionResults'), confidenceScore = $('confidenceScore'),
           detectionMessage = $('detectionMessage'), uploadStatus = $('uploadStatus'),
           cancelUpload = $('cancelUpload'), submitUpload = $('submitUpload');
 
-    // --- b64url helpers for shareable keys ---
+    // --- utils ---
+    const clamp = (n,a,b) => Math.max(a, Math.min(b, n));
+    const getSrc = (item) => typeof item === "string" ? item : item.src;
+    const urlFor = (item) => {
+      const path = getSrc(item).replace(/^\/+/, '');
+      return IS_DEV ? `/${path}` : `${CDN_BASE}/${encodeURI(path)}`;
+    };
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+    // --- TF backend selection (webgl -> wasm -> cpu) ---
+    async function setupTFBackend() {
+      if (tfBackendReady) return;
+      try {
+        if (tf.setWasmPaths) {
+          tf.setWasmPaths('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.15.0/dist/');
+        }
+        const prefs = ['webgl', 'wasm', 'cpu'];
+        for (const b of prefs) {
+          try {
+            await tf.setBackend(b);
+            await tf.ready();
+            tfBackendReady = true;
+            console.log('[tf] backend:', tf.getBackend());
+            break;
+          } catch (err) {
+            console.warn(`[tf] ${b} backend kurulamadı:`, err);
+          }
+        }
+      } catch (e) {
+        console.warn('[tf] backend ayarlanamadı:', e);
+      }
+    }
+
+    // --- TensorFlow.js Model Loading (lazy) ---
+    async function loadModel() {
+      if (model) return model;
+      await setupTFBackend();
+      console.log('COCO-SSD model yükleniyor...');
+      model = await cocoSsd.load({ base: 'lite_mobilenet_v2' }); // daha hızlı
+      console.log('Model yüklendi.');
+      return model;
+    }
+
+    // --- Canvas overlay helpers ---
+    function fitOverlayToImage() {
+      // Match canvas size to the currently rendered preview image box
+      const rect = previewImage.getBoundingClientRect();
+      overlayCanvas.width = Math.max(1, Math.floor(rect.width));
+      overlayCanvas.height = Math.max(1, Math.floor(rect.height));
+      overlayCanvas.style.width = rect.width + 'px';
+      overlayCanvas.style.height = rect.height + 'px';
+    }
+
+    function drawBoxes(preds) {
+      const ctx = overlayCanvas.getContext('2d');
+      ctx.clearRect(0,0,overlayCanvas.width, overlayCanvas.height);
+
+      if (!preds || !preds.length) return;
+
+      // scale from natural image size to current canvas size
+      const sx = overlayCanvas.width / previewImage.naturalWidth;
+      const sy = overlayCanvas.height / previewImage.naturalHeight;
+
+      preds.forEach(p => {
+        if (p.class !== 'cat') return;
+        const [x,y,w,h] = p.bbox;
+        const rx = x * sx, ry = y * sy, rw = w * sx, rh = h * sy;
+
+        // box
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(6,214,160,0.95)';
+        ctx.strokeRect(rx, ry, rw, rh);
+
+        // label background
+        const label = `🐱 ${(p.score*100).toFixed(1)}%`;
+        ctx.font = 'bold 14px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif';
+        const pad = 6;
+        const tw = ctx.measureText(label).width + pad*2;
+        const th = 20;
+        ctx.fillStyle = 'rgba(6,214,160,0.95)';
+        ctx.fillRect(rx - 1, Math.max(ry - th, 0), tw, th);
+
+        // label text
+        ctx.fillStyle = '#0f1115';
+        ctx.textBaseline = 'top';
+        ctx.fillText(label, rx - 1 + pad, Math.max(ry - th, 0) + 3);
+      });
+    }
+
+    // --- Cat Detection ---
+    async function detectCat(imageElement) {
+      await loadModel();
+
+      // Ensure image is decoded and overlay is sized properly
+      try { if (imageElement.decode) await imageElement.decode(); } catch {}
+      fitOverlayToImage();
+
+      const myToken = ++detectRunToken; // cancellation token for race control
+      try {
+        // Allow a short yield so canvas sizing settles
+        await sleep(0);
+
+        // Run detection (minScore kept low to catch distant cats; we'll filter ourselves)
+        const predictions = await model.detect(imageElement, COCO_MAX_BOXES, COCO_MIN_SCORE);
+        if (myToken !== detectRunToken) return { cancelled: true };
+
+        // Filter cats only & sort by score desc
+        const cats = predictions.filter(p => p.class === 'cat').sort((a,b)=>b.score - a.score);
+
+        // Draw overlays (only cats)
+        drawBoxes(cats);
+
+        if (cats.length === 0) {
+          return { hasCat: false, confidence: 0, message: 'Kedi tespit edilemedi', status: 'none' };
+        }
+
+        const best = cats[0];
+        const conf = best.score;
+
+        // Decide status with clearer tiers
+        let message = ''; let status = '';
+        if (conf >= CAT_CONFIDENCE_AUTO) {
+          message = `Kedi tespit edildi! Güven: ${(conf * 100).toFixed(1)}% — Otomatik onaylanacak`;
+          status = 'high';
+        } else if (conf >= CAT_CONFIDENCE_MIN) {
+          message = `Kedi tespit edildi fakat düşük güven: ${(conf * 100).toFixed(1)}% — Admin onayı gerekli`;
+          status = 'medium';
+        } else {
+          message = `Kedi tespit edildi ama çok düşük güven: ${(conf * 100).toFixed(1)}% — Admin onayı gerekli`;
+          status = 'low';
+        }
+
+        return { hasCat: true, confidence: conf, message, status, prediction: best, all: cats };
+      } catch (error) {
+        console.error('Detection error:', error);
+        return { hasCat: false, confidence: 0, message: 'Tespit hatası: ' + error.message, status: 'error' };
+      }
+    }
+
+    // --- Upload Modal Functions ---
+    function showUploadModal() {
+      uploadModal.style.display = 'block';
+      resetUploadModal();
+
+      // Lazy-warm the model right away so user waits less
+      loadModel().catch(e => console.warn('Model prewarm failed:', e));
+    }
+    function hideUploadModal() {
+      uploadModal.style.display = 'none';
+      resetUploadModal();
+    }
+    function resetUploadModal() {
+      selectedFile = null;
+      detectionResult = null;
+      detectRunToken++; // cancel ongoing detection
+      previewContainer.style.display = 'none';
+      overlayCanvas.getContext('2d').clearRect(0,0,overlayCanvas.width, overlayCanvas.height);
+      detectionResults.style.display = 'none';
+      uploadStatus.style.display = 'none';
+      submitUpload.style.display = 'none';
+      fileInput.value = '';
+    }
+    function showUploadStatus(message, type) {
+      uploadStatus.textContent = message;
+      uploadStatus.className = `upload-status ${type}`;
+      uploadStatus.style.display = 'block';
+    }
+    function hideUploadStatus() { uploadStatus.style.display = 'none'; }
+
+    function showDetectionResults(result) {
+      detectionResults.style.display = 'block';
+      detectionResults.className = 'detection-results';
+      if (!result.hasCat) {
+        confidenceScore.textContent = 'Kedi tespit edilemedi';
+        confidenceScore.className = 'confidence-score confidence-low';
+        detectionMessage.textContent = result.message;
+        detectionResults.classList.add('no-cat');
+        submitUpload.style.display = 'none';
+      } else {
+        const pct = (result.confidence * 100).toFixed(1);
+        confidenceScore.textContent = `Güven: ${pct}%`;
+        confidenceScore.className = `confidence-score ${result.status === 'high' ? 'confidence-high' : result.status === 'medium' ? 'confidence-medium' : 'confidence-low'}`;
+        detectionMessage.textContent = result.message;
+        if (result.status !== 'high') detectionResults.classList.add('low-confidence');
+        submitUpload.style.display = 'block';
+      }
+    }
+
+    // Handle file selection & run detection safely
+    async function handleFileSelect(file) {
+      if (!file || !file.type || !file.type.startsWith('image/')) {
+        showUploadStatus('Lütfen geçerli bir resim dosyası seçin', 'error');
+        return;
+      }
+      selectedFile = file;
+      hideUploadStatus();
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        // Show preview
+        previewImage.src = e.target.result;
+        previewContainer.style.display = 'block';
+
+        // Fit overlay after image loads to the new size
+        previewImage.onload = () => { fitOverlayToImage(); drawBoxes([]); };
+
+        showUploadStatus('Kedi tespiti yapılıyor...', 'uploading');
+        const result = await detectCat(previewImage);
+        if (result && !result.cancelled) {
+          detectionResult = result;
+          hideUploadStatus();
+          showDetectionResults(result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function uploadFile() {
+      if (!selectedFile || !detectionResult) {
+        showUploadStatus('Lütfen önce bir dosya seçin ve tespit tamamlansın', 'error');
+        return;
+      }
+      showUploadStatus('Dosya yükleniyor...', 'uploading');
+      submitUpload.disabled = true;
+
+      try {
+        const formData = new FormData();
+        formData.append('image', selectedFile);
+        formData.append('detectionResult', JSON.stringify(detectionResult));
+
+        const response = await fetch(UPLOAD_URL, { method: 'POST', body: formData });
+        let result = {};
+        try { result = await response.json(); } catch {}
+
+        if (response.ok) {
+          showUploadStatus(result.message || 'Yükleme başarılı', 'success');
+          setTimeout(() => {
+            hideUploadModal();
+            if (result && result.autoApproved) location.reload();
+          }, 1200);
+        } else {
+          showUploadStatus(result.error || 'Yükleme hatası', 'error');
+        }
+      } catch (error) {
+        showUploadStatus('Yükleme hatası: ' + error.message, 'error');
+      } finally {
+        submitUpload.disabled = false;
+      }
+    }
+
+    // --- Deep link helpers ---
     function b64urlEncode(str){
       const bytes = new TextEncoder().encode(str);
       let b64 = btoa(String.fromCharCode(...bytes));
@@ -516,205 +463,8 @@
       return new TextDecoder().decode(bytes);
     }
 
-    // --- utils ---
-    function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
-    function getSrc(item){ return typeof item === "string" ? item : item.src; }
-    function urlFor(item){
-      const path = getSrc(item).replace(/^\/+/, '');
-      return IS_DEV ? `/${path}` : `${CDN_BASE}/${encodeURI(path)}`;
-    }
-
-    // --- TensorFlow.js Model Loading ---
-    async function loadModel() {
-      if (model) return model;
-      try {
-        console.log('Loading COCO-SSD model...');
-        model = await cocoSsd.load();
-        console.log('Model loaded successfully');
-        return model;
-      } catch (error) {
-        console.error('Failed to load model:', error);
-        throw error;
-      }
-    }
-
-    // --- Cat Detection ---
-    async function detectCat(imageElement) {
-      if (!model) {
-        await loadModel();
-      }
-      
-      try {
-        const predictions = await model.detect(imageElement);
-        const catPredictions = predictions.filter(p => p.class === 'cat');
-        
-        if (catPredictions.length === 0) {
-          return { hasCat: false, confidence: 0, message: 'Kedi tespit edilemedi' };
-        }
-        
-        const bestCat = catPredictions.reduce((best, current) => 
-          current.score > best.score ? current : best
-        );
-        
-        const confidence = bestCat.score;
-        let message = '';
-        let status = '';
-        
-        if (confidence >= CAT_CONFIDENCE_THRESHOLD) {
-          message = `Kedi tespit edildi! Güven: ${(confidence * 100).toFixed(1)}% - Otomatik onaylanacak`;
-          status = 'high';
-        } else if (confidence >= 0.3) {
-          message = `Kedi tespit edildi ama düşük güven: ${(confidence * 100).toFixed(1)}% - Admin onayı gerekli`;
-          status = 'medium';
-        } else {
-          message = `Kedi tespit edildi ama çok düşük güven: ${(confidence * 100).toFixed(1)}% - Admin onayı gerekli`;
-          status = 'low';
-        }
-        
-        return {
-          hasCat: true,
-          confidence: confidence,
-          message: message,
-          status: status,
-          prediction: bestCat
-        };
-      } catch (error) {
-        console.error('Detection error:', error);
-        return { hasCat: false, confidence: 0, message: 'Tespit hatası: ' + error.message };
-      }
-    }
-
-    // --- Upload Modal Functions ---
-    function showUploadModal() {
-      uploadModal.style.display = 'block';
-      resetUploadModal();
-    }
-
-    function hideUploadModal() {
-      uploadModal.style.display = 'none';
-      resetUploadModal();
-    }
-
-    function resetUploadModal() {
-      selectedFile = null;
-      detectionResult = null;
-      previewContainer.style.display = 'none';
-      detectionResults.style.display = 'none';
-      uploadStatus.style.display = 'none';
-      submitUpload.style.display = 'none';
-      fileInput.value = '';
-    }
-
-    function showUploadStatus(message, type) {
-      uploadStatus.textContent = message;
-      uploadStatus.className = `upload-status ${type}`;
-      uploadStatus.style.display = 'block';
-    }
-
-    function hideUploadStatus() {
-      uploadStatus.style.display = 'none';
-    }
-
-    function showDetectionResults(result) {
-      detectionResults.style.display = 'block';
-      detectionResults.className = 'detection-results';
-      
-      if (!result.hasCat) {
-        confidenceScore.textContent = 'Kedi tespit edilemedi';
-        confidenceScore.className = 'confidence-score confidence-low';
-        detectionMessage.textContent = result.message;
-        detectionResults.classList.add('no-cat');
-        submitUpload.style.display = 'none';
-      } else {
-        const confidencePercent = (result.confidence * 100).toFixed(1);
-        confidenceScore.textContent = `Güven: ${confidencePercent}%`;
-        confidenceScore.className = `confidence-score confidence-${result.status}`;
-        detectionMessage.textContent = result.message;
-        
-        if (result.status === 'medium' || result.status === 'low') {
-          detectionResults.classList.add('low-confidence');
-        }
-        
-        submitUpload.style.display = 'block';
-      }
-    }
-
-    async function handleFileSelect(file) {
-      if (!file || !file.type.startsWith('image/')) {
-        showUploadStatus('Lütfen geçerli bir resim dosyası seçin', 'error');
-        return;
-      }
-
-      selectedFile = file;
-      hideUploadStatus();
-
-      // Show preview
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        previewImage.src = e.target.result;
-        previewContainer.style.display = 'block';
-        
-        // Run detection
-        showUploadStatus('Kedi tespit ediliyor...', 'uploading');
-        
-        try {
-          const result = await detectCat(previewImage);
-          detectionResult = result;
-          hideUploadStatus();
-          showDetectionResults(result);
-        } catch (error) {
-          hideUploadStatus();
-          showUploadStatus('Tespit hatası: ' + error.message, 'error');
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-
-    async function uploadFile() {
-      if (!selectedFile || !detectionResult) {
-        showUploadStatus('Lütfen önce bir dosya seçin ve tespit tamamlansın', 'error');
-        return;
-      }
-
-      showUploadStatus('Dosya yükleniyor...', 'uploading');
-      submitUpload.disabled = true;
-
-      try {
-        const formData = new FormData();
-        formData.append('image', selectedFile);
-        formData.append('detectionResult', JSON.stringify(detectionResult));
-
-        const response = await fetch(UPLOAD_URL, {
-          method: 'POST',
-          body: formData
-        });
-
-        const result = await response.json();
-
-        if (response.ok) {
-          showUploadStatus(result.message, 'success');
-          setTimeout(() => {
-            hideUploadModal();
-            // Optionally refresh the image list
-            if (result.autoApproved) {
-              location.reload();
-            }
-          }, 2000);
-        } else {
-          showUploadStatus(result.error || 'Yükleme hatası', 'error');
-        }
-      } catch (error) {
-        showUploadStatus('Yükleme hatası: ' + error.message, 'error');
-      } finally {
-        submitUpload.disabled = false;
-      }
-    }
-
-    // Read index or shared key from URL
     function getInitialIndex(){
       const url = new URL(location.href);
-
-      // If landing with ?k=<base64url(key)>, try to jump to that image
       const sharedKey = url.searchParams.get('k');
       if (sharedKey) {
         try {
@@ -723,17 +473,13 @@
           if (i >= 0) return i;
         } catch {}
       }
-
       const q = url.searchParams.get('i');
       if (q !== null) return clamp(parseInt(q,10)||0, 0, images.length-1);
-
       const h = new URLSearchParams(url.hash.replace(/^#/,''));
       if (h.has('i')) return clamp(parseInt(h.get('i'),10)||0, 0, images.length-1);
-
       return 0;
     }
 
-    // After consuming ?k once, remove it so shares don't accidentally include it
     function consumeSharedKeyOnce(){
       const url = new URL(location.href);
       if (url.searchParams.has('k')) {
@@ -742,21 +488,25 @@
       }
     }
 
+    function updateSocialMetaTags(imageSrc, filename) {
+      const ogImage = document.querySelector('meta[property="og:image"]');
+      if (ogImage) ogImage.setAttribute('content', imageSrc);
+      const twitterImage = document.querySelector('meta[property="twitter:image"]');
+      if (twitterImage) twitterImage.setAttribute('content', imageSrc);
+      const ogTitle = document.querySelector('meta[property="og:title"]');
+      if (ogTitle) ogTitle.setAttribute('content', `turkkedy.net • ${filename}`);
+      const twitterTitle = document.querySelector('meta[property="twitter:title"]');
+      if (twitterTitle) twitterTitle.setAttribute('content', `turkkedy.net • ${filename}`);
+    }
+
     function render(){
       const item = images[index];
       const src = urlFor(item);
       const fname = decodeURIComponent(getSrc(item).split('/').pop());
 
-      // Add loading state
       imgEl.classList.add('loading');
-      
-      imgEl.onload = () => {
-        imgEl.classList.remove('loading');
-      };
-      
-      imgEl.onerror = () => {
-        imgEl.classList.remove('loading');
-      };
+      imgEl.onload = () => imgEl.classList.remove('loading');
+      imgEl.onerror = () => imgEl.classList.remove('loading');
 
       imgEl.src = src;
       imgEl.alt = `cat: ${fname}`;
@@ -764,13 +514,15 @@
       totalEl.textContent = images.length;
       fileEl.textContent = fname;
 
-      // Update social media meta tags for current image
-      const fullSrc = IS_DEV ? src : src.replace(/^https:\/\/medias\.turkkedy\.net\//, 'https://medias.turkkedy.net/');
+      // Update unfurl meta for current image
+      const fullSrc = src; // already absolute on prod
       updateSocialMetaTags(fullSrc, fname);
 
       // Preload next
       const nextIdx = (index + 1) % images.length;
       const preload = new Image();
+      preload.decoding = 'async';
+      preload.loading = 'eager';
       preload.src = urlFor(images[nextIdx]);
 
       // Update deep link (?i=)
@@ -779,25 +531,8 @@
       history.replaceState(null, '', url.toString());
     }
 
-    function updateSocialMetaTags(imageSrc, filename) {
-      // Update Open Graph image
-      const ogImage = document.querySelector('meta[property="og:image"]');
-      if (ogImage) ogImage.setAttribute('content', imageSrc);
-      
-      // Update Twitter image
-      const twitterImage = document.querySelector('meta[property="twitter:image"]');
-      if (twitterImage) twitterImage.setAttribute('content', imageSrc);
-      
-      // Update title and description to include filename
-      const ogTitle = document.querySelector('meta[property="og:title"]');
-      if (ogTitle) ogTitle.setAttribute('content', `turkkedy.net • ${filename}`);
-      
-      const twitterTitle = document.querySelector('meta[property="twitter:title"]');
-      if (twitterTitle) twitterTitle.setAttribute('content', `turkkedy.net • ${filename}`);
-    }
-
-    function next(){ index = (index + 1) % images.length; render(); }
-    function prev(){ index = (index - 1 + images.length) % images.length; render(); }
+    function next(){ if (!images.length) return; index = (index + 1) % images.length; render(); }
+    function prev(){ if (!images.length) return; index = (index - 1 + images.length) % images.length; render(); }
     function random(){
       if (images.length <= 1) return;
       let r = Math.floor(Math.random() * images.length);
@@ -805,7 +540,6 @@
       index = r; render();
     }
 
-    // Current image key (handles initial ?k= case, falls back to manifest item)
     function getCurrentKey(){
       const url = new URL(location.href);
       const k = url.searchParams.get('k');
@@ -813,15 +547,12 @@
       const item = images[index];
       return item ? getSrc(item) : null;
     }
-
-    // Build a share URL that unfurls with an image preview via /p/<key>
     function buildShareURL(){
       const key = getCurrentKey();
-      if (!key) return location.href; // fallback
+      if (!key) return location.href;
       const enc = b64urlEncode(key);
-      return `${location.origin}/p/${enc}`; // NOTE: no ?k= on /p links
+      return `${location.origin}/p/${enc}`;
     }
-
     async function share(){
       const shareUrl = buildShareURL();
       const title = 'turkkedy.net • cat';
@@ -830,132 +561,111 @@
           await navigator.share({ title, url: shareUrl });
         } else {
           await navigator.clipboard.writeText(shareUrl);
-          shareBtn.textContent = '✔ Kopyalandı';
-          setTimeout(() => (shareBtn.textContent = '🔗 Paylaş'), 1200);
         }
+        const old = shareBtn.textContent;
+        shareBtn.textContent = '✔ Kopyalandı';
+        setTimeout(() => (shareBtn.textContent = old), 1200);
       } catch {
-        try {
-          await navigator.clipboard.writeText(shareUrl);
-          shareBtn.textContent = '✔ Kopyalandı';
-          setTimeout(() => (shareBtn.textContent = '🔗 Paylaş'), 1200);
-        } catch {}
+        // ignore
       }
     }
 
     // Touch/swipe handling
     function handleTouchStart(e) {
+      if (!e.touches || e.touches.length === 0) return;
       touchStartX = e.touches[0].clientX;
       touchStartY = e.touches[0].clientY;
       isSwiping = false;
     }
-
     function handleTouchMove(e) {
-      if (!touchStartX || !touchStartY) return;
-      
+      if (!touchStartX || !touchStartY || !e.touches || e.touches.length === 0) return;
       const touchEndX = e.touches[0].clientX;
       const touchEndY = e.touches[0].clientY;
-      
       const diffX = touchStartX - touchEndX;
       const diffY = touchStartY - touchEndY;
-      
-      // Check if it's a horizontal swipe (more horizontal than vertical)
       if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
         isSwiping = true;
         e.preventDefault();
       }
     }
-
     function handleTouchEnd(e) {
-      if (!isSwiping) return;
-      
+      if (!isSwiping || !e.changedTouches || e.changedTouches.length === 0) return;
       const touchEndX = e.changedTouches[0].clientX;
       const diffX = touchStartX - touchEndX;
-      
-      if (Math.abs(diffX) > 50) {
-        if (diffX > 0) {
-          next(); // Swipe left
-        } else {
-          prev(); // Swipe right
-        }
-      }
-      
-      touchStartX = 0;
-      touchStartY = 0;
-      isSwiping = false;
+      if (Math.abs(diffX) > 50) { if (diffX > 0) next(); else prev(); }
+      touchStartX = 0; touchStartY = 0; isSwiping = false;
     }
 
-    // Shortcuts & clicks
+    // Keyboard shortcuts
     window.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight') next();
       else if (e.key === 'ArrowLeft') prev();
       else if (e.key.toLowerCase() === 'r') random();
       else if (e.key.toLowerCase() === 's') share();
     });
-    
+
     // Touch events
     imgEl.addEventListener('touchstart', handleTouchStart, { passive: false });
     imgEl.addEventListener('touchmove', handleTouchMove, { passive: false });
     imgEl.addEventListener('touchend', handleTouchEnd, { passive: true });
-    
-    imgEl.onclick = next;
-    prevBtn.onclick = prev; nextBtn.onclick = next;
-    randBtn.onclick = random; shareBtn.onclick = share;
-    uploadBtn.onclick = showUploadModal;
 
-    // Upload modal event listeners
-    closeModal.onclick = hideUploadModal;
-    cancelUpload.onclick = hideUploadModal;
-    submitUpload.onclick = uploadFile;
+    imgEl.addEventListener('click', next);
+    prevBtn.addEventListener('click', prev);
+    nextBtn.addEventListener('click', next);
+    randBtn.addEventListener('click', random);
+    shareBtn.addEventListener('click', share);
+    uploadBtn.addEventListener('click', showUploadModal);
 
-    // Click outside modal to close
-    uploadModal.onclick = (e) => {
-      if (e.target === uploadModal) hideUploadModal();
-    };
+    // Modal listeners
+    closeModal.addEventListener('click', hideUploadModal);
+    closeModal.addEventListener('keydown', (e)=>{ if (e.key==='Enter' || e.key===' ') hideUploadModal(); });
+    cancelUpload.addEventListener('click', hideUploadModal);
+    submitUpload.addEventListener('click', uploadFile);
+
+    uploadModal.addEventListener('click', (e) => { if (e.target === uploadModal) hideUploadModal(); });
 
     // File input handling
-    fileInput.onchange = (e) => {
-      if (e.target.files.length > 0) {
-        handleFileSelect(e.target.files[0]);
-      }
-    };
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length > 0) handleFileSelect(e.target.files[0]);
+    });
 
-    // Drag and drop handling
-    uploadArea.onclick = () => fileInput.click();
-    
-    uploadArea.ondragover = (e) => {
-      e.preventDefault();
-      uploadArea.classList.add('dragover');
-    };
-    
-    uploadArea.ondragleave = (e) => {
-      e.preventDefault();
-      uploadArea.classList.remove('dragover');
-    };
-    
-    uploadArea.ondrop = (e) => {
-      e.preventDefault();
-      uploadArea.classList.remove('dragover');
-      
-      if (e.dataTransfer.files.length > 0) {
-        handleFileSelect(e.dataTransfer.files[0]);
-      }
-    };
+    // Drag & drop handling
+    const activateDrop = (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); };
+    const deactivateDrop = (e) => { e.preventDefault(); uploadArea.classList.remove('dragover'); };
+    uploadArea.addEventListener('click', () => fileInput.click());
+    uploadArea.addEventListener('dragover', activateDrop);
+    uploadArea.addEventListener('dragleave', deactivateDrop);
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault(); uploadArea.classList.remove('dragover');
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) handleFileSelect(e.dataTransfer.files[0]);
+    });
 
-    // Init
+    // Keep overlay sized if user resizes modal or viewport
+    window.addEventListener('resize', () => { if (previewContainer.style.display !== 'none') { fitOverlayToImage(); } });
+
+    // Init gallery
     (async function init(){
       try {
-        const res = await fetch(MANIFEST_URL, { cache: 'no-store' });
+        const res = await fetch(MANIFEST_URL, { cache: 'no-store', credentials: 'omit' });
         images = await res.json();
         if (!Array.isArray(images) || images.length === 0) throw new Error('No images found');
 
         index = getInitialIndex();
-        consumeSharedKeyOnce();   // strip ?k= after using it
+        consumeSharedKeyOnce();
         render();
+
+        // Idle-prewarm TF to hide first-load latency (non-blocking)
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(() => loadModel().catch(()=>{}), { timeout: 2000 });
+        } else {
+          setTimeout(() => loadModel().catch(()=>{}), 1500);
+        }
       } catch (e) {
         document.body.innerHTML = '<p style="padding:20px;color:#f66">Failed to load images. Check R2 public access and the /api/manifest function.</p>';
         console.error(e);
       }
     })();
+  });
   </script>
 </body>
 </html>
