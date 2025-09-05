@@ -19,6 +19,16 @@ function b64urlDecode(s: string): string {
   return new TextDecoder().decode(bytes);
 }
 
+async function generateShortHash(input: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(input);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  // Take first 6 bytes (48 bits) for a short but unique hash
+  const shortHash = hashArray.slice(0, 6).map(b => b.toString(36)).join('');
+  return shortHash;
+}
+
 function isSocialMediaCrawler(userAgent: string): boolean {
   const crawlers = [
     'facebookexternalhit',
@@ -55,7 +65,44 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
     let key: string;
     try { key = b64urlDecode(keyParam); }
     catch { return new Response("Bad key", { status: 400 }); }
-  
+
+    // Handle backwards compatibility: old keys have full path, new keys have hash
+    let targetIndex = -1;
+    if (!key.includes('/')) {
+      // New format: hash of filename, need to find actual filename and index
+      // Use the manifest API to find the matching file by hash
+      try {
+        const manifestUrl = `${new URL(request.url).origin}/api/manifest`;
+        const manifestRes = await fetch(manifestUrl);
+        if (manifestRes.ok) {
+          const images: any[] = await manifestRes.json();
+
+          // Find the image whose filename hash matches the key
+          let matchingImage: any = null;
+          for (let i = 0; i < images.length; i++) {
+            const img = images[i];
+            const filename = typeof img === 'string' ? img : (img as any).src;
+            const hash = await generateShortHash(filename);
+            if (hash === key) {
+              matchingImage = img;
+              targetIndex = i;
+              break;
+            }
+          }
+
+          if (matchingImage) {
+            key = typeof matchingImage === 'string' ? matchingImage : (matchingImage as any).src;
+          } else {
+            return new Response("Not found", { status: 404 });
+          }
+        } else {
+          return new Response("Manifest unavailable", { status: 500 });
+        }
+      } catch (error) {
+        return new Response("Lookup failed", { status: 500 });
+      }
+    }
+
     // Optionally confirm object exists (cheap HEAD via R2)
     const head = await env.cats.head(key);
     if (!head) return new Response("Not found", { status: 404 });
@@ -64,14 +111,23 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
     const originalFilename = key.split('/').pop() || 'cat';
     
     // Create a cleaner title and description
-    const cleanTitle = "Cute Cat Photo • turkkedy.net";
-    const dynamicDesc = `Check out this adorable cat photo on turkkedy.net! 🐱`;
+    const cleanTitle = "turkkedy.net";
+    const dynamicDesc = `🐱🐱🐱🐱🐱🐱🐱🐱🐱🐱🐱🐱meow`;
     const canonical = `${env.SITE_BASE}/p/${encodeURIComponent(keyParam)}`;
   
     // Check if this is a social media crawler
     const userAgent = request.headers.get('user-agent') || '';
     const isCrawler = isSocialMediaCrawler(userAgent);
-    const viewerUrl = `${env.SITE_BASE}/?k=${encodeURIComponent(keyParam)}`;
+
+    // Generate viewer URL based on whether this was a hash-based or legacy URL
+    let viewerUrl: string;
+    if (targetIndex >= 0) {
+      // This was resolved from a hash, redirect to the correct index
+      viewerUrl = `${env.SITE_BASE}/?i=${targetIndex}`;
+    } else {
+      // Legacy format with full path
+      viewerUrl = `${env.SITE_BASE}/?k=${encodeURIComponent(keyParam)}`;
+    }
   
     const html = `<!doctype html>
 <html lang="en">
@@ -86,7 +142,7 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 <meta property="og:title" content="${cleanTitle}">
 <meta property="og:description" content="${dynamicDesc}">
 <meta property="og:image" content="${imgUrl}">
-<meta property="og:image:alt" content="Adorable cat photo">
+<meta property="og:image:alt" content="kedy">
 <meta property="og:url" content="${canonical}">
 <meta property="og:site_name" content="turkkedy.net">
 <meta property="og:locale" content="en_US">
@@ -104,7 +160,7 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 <meta name="twitter:title" content="${cleanTitle}">
 <meta name="twitter:description" content="${dynamicDesc}">
 <meta name="twitter:image" content="${imgUrl}">
-<meta name="twitter:image:alt" content="Adorable cat photo">
+<meta name="twitter:image:alt" content="kedy">
 
 <!-- Additional Meta for Better Crawling -->
 <meta name="robots" content="index, follow">
@@ -132,7 +188,7 @@ ${isCrawler ? '' : '<meta http-equiv="refresh" content="0;url=' + viewerUrl + '"
   ${isCrawler ? 
     `<h1>${cleanTitle}</h1>
      <p>${dynamicDesc}</p>
-     <img src="${imgUrl}" alt="Adorable cat photo" />
+     <img src="${imgUrl}" alt="kedy" />
      <p><small>Original: ${originalFilename}</small></p>` : 
     `<p>Loading your cat photo... If you are not redirected, <a href="${viewerUrl}">click here</a>.</p>`
   }

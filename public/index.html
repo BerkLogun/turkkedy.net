@@ -110,7 +110,7 @@
       <button id="prevBtn" title="Previous (←)" aria-label="Önceki">⟵ Önceki</button>
       <button id="nextBtn" title="Next (→)" aria-label="Sonraki">Sonraki ⟶</button>
       <button id="randBtn" title="Random (R)" aria-label="Rastgele">🎲 Rastgele</button>
-      <button id="shareBtn" title="Share (S)" aria-label="Paylaş">🔗 Paylaş</button>
+      <button id="shareBtn" title="Share (Click) or Copy URL (Double-click/S)" aria-label="Paylaş veya URL'yi Kopyala">🔗 Paylaş</button>
       <button id="uploadBtn" title="Upload Cat Photo" aria-haspopup="dialog" aria-controls="uploadModal">📸 Kedi Yükle</button>
     </div>
     <div class="spacer"></div>
@@ -209,6 +209,16 @@
       return IS_DEV ? `/${path}` : `${CDN_BASE}/${encodeURI(path)}`;
     };
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+    async function generateShortHash(input) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(input);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      // Take first 6 bytes (48 bits) for a short but unique hash
+      const shortHash = hashArray.slice(0, 6).map(b => b.toString(36)).join('');
+      return shortHash;
+    }
 
     // --- TF backend selection (webgl -> wasm -> cpu) ---
     async function setupTFBackend() {
@@ -702,21 +712,49 @@
       const item = images[index];
       return item ? getSrc(item) : null;
     }
-    function buildShareURL(){
+    async function buildShareURL(){
       const key = getCurrentKey();
       if (!key) return location.href;
-      const enc = b64urlEncode(key);
+      // Generate hash of the full path for guaranteed unique, short URLs
+      const hash = await generateShortHash(key);
+      const enc = b64urlEncode(hash);
       return `${location.origin}/p/${enc}`;
     }
     async function share(){
-      const shareUrl = buildShareURL();
-      const title = 'turkkedy.net • cat';
+      const shareUrl = await buildShareURL();
+      const title = 'turkkedy.net';
       try {
         if (navigator.share) {
           await navigator.share({ title, url: shareUrl });
+          // If share dialog completes successfully, show feedback
+          const old = shareBtn.textContent;
+          shareBtn.textContent = '✔ Paylaşıldı';
+          setTimeout(() => (shareBtn.textContent = old), 1200);
         } else {
+          // Fallback to clipboard copy
           await navigator.clipboard.writeText(shareUrl);
+          const old = shareBtn.textContent;
+          shareBtn.textContent = '✔ Kopyalandı';
+          setTimeout(() => (shareBtn.textContent = old), 1200);
         }
+      } catch(e) {
+        // If share dialog is cancelled or fails, fallback to clipboard
+        console.error('Share failed, falling back to clipboard:', e);
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          const old = shareBtn.textContent;
+          shareBtn.textContent = '✔ Kopyalandı';
+          setTimeout(() => (shareBtn.textContent = old), 1200);
+        } catch(clipboardError) {
+          console.error('Clipboard copy also failed:', clipboardError);
+        }
+      }
+    }
+
+    async function copyToClipboard(){
+      const shareUrl = await buildShareURL();
+      try {
+        await navigator.clipboard.writeText(shareUrl);
         const old = shareBtn.textContent;
         shareBtn.textContent = '✔ Kopyalandı';
         setTimeout(() => (shareBtn.textContent = old), 1200);
@@ -756,7 +794,7 @@
       if (e.key === 'ArrowRight') next();
       else if (e.key === 'ArrowLeft') prev();
       else if (e.key.toLowerCase() === 'r') random();
-      else if (e.key.toLowerCase() === 's') share();
+      else if (e.key.toLowerCase() === 's') copyToClipboard();
     });
 
     // Touch events
@@ -769,6 +807,7 @@
     nextBtn.addEventListener('click', next);
     randBtn.addEventListener('click', random);
     shareBtn.addEventListener('click', share);
+    shareBtn.addEventListener('dblclick', copyToClipboard);
     uploadBtn.addEventListener('click', showUploadModal);
 
     // Modal listeners
