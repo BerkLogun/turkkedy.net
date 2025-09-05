@@ -6,6 +6,10 @@
   <title>turkkedy.net • Cats</title>
   <meta name="description" content="endless cats on turkkedy.net" />
   
+  <!-- TensorFlow.js for object detection -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
+  
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://turkkedy.net/" />
@@ -220,6 +224,195 @@
         display: none;
       }
     }
+    
+    /* Upload Modal Styles */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.8);
+      backdrop-filter: blur(4px);
+    }
+    
+    .modal-content {
+      background: var(--bg);
+      margin: 5% auto;
+      padding: 20px;
+      border: 1px solid #2b2f38;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 500px;
+      max-height: 80vh;
+      overflow-y: auto;
+      position: relative;
+    }
+    
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #2b2f38;
+    }
+    
+    .modal-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--fg);
+    }
+    
+    .close {
+      color: var(--muted);
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+      line-height: 1;
+    }
+    
+    .close:hover {
+      color: var(--fg);
+    }
+    
+    .upload-area {
+      border: 2px dashed #2b2f38;
+      border-radius: 8px;
+      padding: 40px 20px;
+      text-align: center;
+      margin-bottom: 20px;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+    
+    .upload-area:hover {
+      border-color: var(--muted);
+      background: rgba(255,255,255,0.02);
+    }
+    
+    .upload-area.dragover {
+      border-color: #06d6a0;
+      background: rgba(6,214,160,0.1);
+    }
+    
+    .upload-icon {
+      font-size: 48px;
+      margin-bottom: 10px;
+      opacity: 0.7;
+    }
+    
+    .upload-text {
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    
+    .upload-hint {
+      font-size: 12px;
+      color: var(--muted);
+      opacity: 0.8;
+    }
+    
+    .file-input {
+      display: none;
+    }
+    
+    .preview-container {
+      margin: 20px 0;
+      text-align: center;
+    }
+    
+    .preview-image {
+      max-width: 100%;
+      max-height: 300px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    
+    .detection-results {
+      margin: 15px 0;
+      padding: 15px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+      border-left: 4px solid #06d6a0;
+    }
+    
+    .detection-results.low-confidence {
+      border-left-color: #ffd166;
+    }
+    
+    .detection-results.no-cat {
+      border-left-color: #f77f00;
+    }
+    
+    .confidence-score {
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+    
+    .confidence-high { color: #06d6a0; }
+    .confidence-medium { color: #ffd166; }
+    .confidence-low { color: #f77f00; }
+    
+    .upload-status {
+      margin: 15px 0;
+      padding: 10px;
+      border-radius: 6px;
+      text-align: center;
+      font-weight: 500;
+    }
+    
+    .upload-status.uploading {
+      background: rgba(6,214,160,0.2);
+      color: #06d6a0;
+    }
+    
+    .upload-status.success {
+      background: rgba(6,214,160,0.2);
+      color: #06d6a0;
+    }
+    
+    .upload-status.error {
+      background: rgba(247,127,0,0.2);
+      color: #f77f00;
+    }
+    
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+    
+    .modal-actions button {
+      min-width: 100px;
+    }
+    
+    @media (max-width: 768px) {
+      .modal-content {
+        margin: 10% auto;
+        width: 95%;
+        padding: 15px;
+      }
+      
+      .upload-area {
+        padding: 30px 15px;
+      }
+      
+      .upload-icon {
+        font-size: 36px;
+      }
+      
+      .modal-actions {
+        flex-direction: column;
+      }
+      
+      .modal-actions button {
+        width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
@@ -229,6 +422,7 @@
       <button id="nextBtn" title="Next (→)">Sonraki ⟶</button>
       <button id="randBtn" title="Random (R)">🎲 Rastgele</button>
       <button id="shareBtn" title="Share (S)">🔗 Paylaş</button>
+      <button id="uploadBtn" title="Upload Cat Photo">📸 Kedi Yükle</button>
     </div>
     <div class="spacer"></div>
     <div>
@@ -242,11 +436,46 @@
     <div class="swipe-hint">← Swipe to navigate →</div>
   </main>
 
+  <!-- Upload Modal -->
+  <div id="uploadModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">🐱 Kedi Fotoğrafı Yükle</h3>
+        <span class="close" id="closeModal">&times;</span>
+      </div>
+      
+      <div class="upload-area" id="uploadArea">
+        <div class="upload-icon">📸</div>
+        <div class="upload-text">Fotoğrafı buraya sürükleyin veya tıklayın</div>
+        <div class="upload-hint">JPG, PNG, WebP formatları desteklenir</div>
+        <input type="file" id="fileInput" class="file-input" accept="image/*" />
+      </div>
+      
+      <div id="previewContainer" class="preview-container" style="display: none;">
+        <img id="previewImage" class="preview-image" alt="Preview" />
+      </div>
+      
+      <div id="detectionResults" class="detection-results" style="display: none;">
+        <div id="confidenceScore" class="confidence-score"></div>
+        <div id="detectionMessage"></div>
+      </div>
+      
+      <div id="uploadStatus" class="upload-status" style="display: none;"></div>
+      
+      <div class="modal-actions">
+        <button id="cancelUpload" type="button">İptal</button>
+        <button id="submitUpload" type="button" style="display: none;">Yükle</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // --- CONFIG ---
     const IS_DEV = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
     const CDN_BASE = IS_DEV ? '' : 'https://medias.turkkedy.net';           // R2 custom/public domain
     const MANIFEST_URL = IS_DEV ? '/api/local-manifest' : '/api/manifest';  // Pages Function
+    const UPLOAD_URL = '/api/upload';  // Upload endpoint
+    const CAT_CONFIDENCE_THRESHOLD = 0.7;  // Minimum confidence for auto-approval
 
     // --- STATE ---
     let images = [];
@@ -254,12 +483,25 @@
     let touchStartX = 0;
     let touchStartY = 0;
     let isSwiping = false;
+    
+    // Upload state
+    let model = null;
+    let selectedFile = null;
+    let detectionResult = null;
 
     // --- DOM helpers ---
     const $ = (id) => document.getElementById(id);
     const imgEl = $('frame'), totalEl = $('total'), currentEl = $('currentIdx'),
           fileEl = $('filename'), prevBtn = $('prevBtn'), nextBtn = $('nextBtn'),
-          randBtn = $('randBtn'), shareBtn = $('shareBtn');
+          randBtn = $('randBtn'), shareBtn = $('shareBtn'), uploadBtn = $('uploadBtn');
+    
+    // Upload modal elements
+    const uploadModal = $('uploadModal'), closeModal = $('closeModal'),
+          uploadArea = $('uploadArea'), fileInput = $('fileInput'),
+          previewContainer = $('previewContainer'), previewImage = $('previewImage'),
+          detectionResults = $('detectionResults'), confidenceScore = $('confidenceScore'),
+          detectionMessage = $('detectionMessage'), uploadStatus = $('uploadStatus'),
+          cancelUpload = $('cancelUpload'), submitUpload = $('submitUpload');
 
     // --- b64url helpers for shareable keys ---
     function b64urlEncode(str){
@@ -280,6 +522,192 @@
     function urlFor(item){
       const path = getSrc(item).replace(/^\/+/, '');
       return IS_DEV ? `/${path}` : `${CDN_BASE}/${encodeURI(path)}`;
+    }
+
+    // --- TensorFlow.js Model Loading ---
+    async function loadModel() {
+      if (model) return model;
+      try {
+        console.log('Loading COCO-SSD model...');
+        model = await cocoSsd.load();
+        console.log('Model loaded successfully');
+        return model;
+      } catch (error) {
+        console.error('Failed to load model:', error);
+        throw error;
+      }
+    }
+
+    // --- Cat Detection ---
+    async function detectCat(imageElement) {
+      if (!model) {
+        await loadModel();
+      }
+      
+      try {
+        const predictions = await model.detect(imageElement);
+        const catPredictions = predictions.filter(p => p.class === 'cat');
+        
+        if (catPredictions.length === 0) {
+          return { hasCat: false, confidence: 0, message: 'Kedi tespit edilemedi' };
+        }
+        
+        const bestCat = catPredictions.reduce((best, current) => 
+          current.score > best.score ? current : best
+        );
+        
+        const confidence = bestCat.score;
+        let message = '';
+        let status = '';
+        
+        if (confidence >= CAT_CONFIDENCE_THRESHOLD) {
+          message = `Kedi tespit edildi! Güven: ${(confidence * 100).toFixed(1)}% - Otomatik onaylanacak`;
+          status = 'high';
+        } else if (confidence >= 0.3) {
+          message = `Kedi tespit edildi ama düşük güven: ${(confidence * 100).toFixed(1)}% - Admin onayı gerekli`;
+          status = 'medium';
+        } else {
+          message = `Kedi tespit edildi ama çok düşük güven: ${(confidence * 100).toFixed(1)}% - Admin onayı gerekli`;
+          status = 'low';
+        }
+        
+        return {
+          hasCat: true,
+          confidence: confidence,
+          message: message,
+          status: status,
+          prediction: bestCat
+        };
+      } catch (error) {
+        console.error('Detection error:', error);
+        return { hasCat: false, confidence: 0, message: 'Tespit hatası: ' + error.message };
+      }
+    }
+
+    // --- Upload Modal Functions ---
+    function showUploadModal() {
+      uploadModal.style.display = 'block';
+      resetUploadModal();
+    }
+
+    function hideUploadModal() {
+      uploadModal.style.display = 'none';
+      resetUploadModal();
+    }
+
+    function resetUploadModal() {
+      selectedFile = null;
+      detectionResult = null;
+      previewContainer.style.display = 'none';
+      detectionResults.style.display = 'none';
+      uploadStatus.style.display = 'none';
+      submitUpload.style.display = 'none';
+      fileInput.value = '';
+    }
+
+    function showUploadStatus(message, type) {
+      uploadStatus.textContent = message;
+      uploadStatus.className = `upload-status ${type}`;
+      uploadStatus.style.display = 'block';
+    }
+
+    function hideUploadStatus() {
+      uploadStatus.style.display = 'none';
+    }
+
+    function showDetectionResults(result) {
+      detectionResults.style.display = 'block';
+      detectionResults.className = 'detection-results';
+      
+      if (!result.hasCat) {
+        confidenceScore.textContent = 'Kedi tespit edilemedi';
+        confidenceScore.className = 'confidence-score confidence-low';
+        detectionMessage.textContent = result.message;
+        detectionResults.classList.add('no-cat');
+        submitUpload.style.display = 'none';
+      } else {
+        const confidencePercent = (result.confidence * 100).toFixed(1);
+        confidenceScore.textContent = `Güven: ${confidencePercent}%`;
+        confidenceScore.className = `confidence-score confidence-${result.status}`;
+        detectionMessage.textContent = result.message;
+        
+        if (result.status === 'medium' || result.status === 'low') {
+          detectionResults.classList.add('low-confidence');
+        }
+        
+        submitUpload.style.display = 'block';
+      }
+    }
+
+    async function handleFileSelect(file) {
+      if (!file || !file.type.startsWith('image/')) {
+        showUploadStatus('Lütfen geçerli bir resim dosyası seçin', 'error');
+        return;
+      }
+
+      selectedFile = file;
+      hideUploadStatus();
+
+      // Show preview
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        previewImage.src = e.target.result;
+        previewContainer.style.display = 'block';
+        
+        // Run detection
+        showUploadStatus('Kedi tespit ediliyor...', 'uploading');
+        
+        try {
+          const result = await detectCat(previewImage);
+          detectionResult = result;
+          hideUploadStatus();
+          showDetectionResults(result);
+        } catch (error) {
+          hideUploadStatus();
+          showUploadStatus('Tespit hatası: ' + error.message, 'error');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function uploadFile() {
+      if (!selectedFile || !detectionResult) {
+        showUploadStatus('Lütfen önce bir dosya seçin ve tespit tamamlansın', 'error');
+        return;
+      }
+
+      showUploadStatus('Dosya yükleniyor...', 'uploading');
+      submitUpload.disabled = true;
+
+      try {
+        const formData = new FormData();
+        formData.append('image', selectedFile);
+        formData.append('detectionResult', JSON.stringify(detectionResult));
+
+        const response = await fetch(UPLOAD_URL, {
+          method: 'POST',
+          body: formData
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          showUploadStatus(result.message, 'success');
+          setTimeout(() => {
+            hideUploadModal();
+            // Optionally refresh the image list
+            if (result.autoApproved) {
+              location.reload();
+            }
+          }, 2000);
+        } else {
+          showUploadStatus(result.error || 'Yükleme hatası', 'error');
+        }
+      } catch (error) {
+        showUploadStatus('Yükleme hatası: ' + error.message, 'error');
+      } finally {
+        submitUpload.disabled = false;
+      }
     }
 
     // Read index or shared key from URL
@@ -472,6 +900,46 @@
     imgEl.onclick = next;
     prevBtn.onclick = prev; nextBtn.onclick = next;
     randBtn.onclick = random; shareBtn.onclick = share;
+    uploadBtn.onclick = showUploadModal;
+
+    // Upload modal event listeners
+    closeModal.onclick = hideUploadModal;
+    cancelUpload.onclick = hideUploadModal;
+    submitUpload.onclick = uploadFile;
+
+    // Click outside modal to close
+    uploadModal.onclick = (e) => {
+      if (e.target === uploadModal) hideUploadModal();
+    };
+
+    // File input handling
+    fileInput.onchange = (e) => {
+      if (e.target.files.length > 0) {
+        handleFileSelect(e.target.files[0]);
+      }
+    };
+
+    // Drag and drop handling
+    uploadArea.onclick = () => fileInput.click();
+    
+    uploadArea.ondragover = (e) => {
+      e.preventDefault();
+      uploadArea.classList.add('dragover');
+    };
+    
+    uploadArea.ondragleave = (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+    };
+    
+    uploadArea.ondrop = (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+      
+      if (e.dataTransfer.files.length > 0) {
+        handleFileSelect(e.dataTransfer.files[0]);
+      }
+    };
 
     // Init
     (async function init(){
