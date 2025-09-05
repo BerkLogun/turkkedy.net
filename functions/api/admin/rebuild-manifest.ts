@@ -5,7 +5,7 @@ interface Env {
 
 export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
   const url = new URL(request.url);
-  const token = url.searchParams.get('key');
+  const token = url.searchParams.get('token');
   if (!token || token !== env.ADMIN_TOKEN) {
     return new Response("Unauthorized", { status: 401 });
   }
