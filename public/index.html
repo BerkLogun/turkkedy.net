@@ -182,6 +182,7 @@
     // Upload state
     let model = null;
     let selectedFile = null;
+    let processedFile = null;        // processed image ready for upload
     let detectionResult = null;
     let detectRunToken = 0;          // cancel/race protection
     let tfBackendReady = false;
@@ -339,6 +340,119 @@
       }
     }
 
+    // --- Image Optimization ---
+    async function optimizeImage(file) {
+      console.log('Starting image optimization for:', file.name, 'size:', file.size);
+
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        img.onload = () => {
+          try {
+            // Calculate new dimensions (max 1600px)
+            const maxDim = 1600;
+            let { width, height } = img;
+
+            if (Math.max(width, height) > maxDim) {
+              const scale = maxDim / Math.max(width, height);
+              width = Math.round(width * scale);
+              height = Math.round(height * scale);
+              console.log('Resizing from', img.width, 'x', img.height, 'to', width, 'x', height);
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+
+            // Draw and resize image
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // Add random watermark
+            const watermarkText = 'turkkedy.net';
+            const baseFontSize = Math.max(16, Math.min(width, height) * 0.02);
+            const fontSize = baseFontSize * (0.8 + Math.random() * 0.4); // Random size ±20%
+            ctx.font = `${fontSize}px Arial`;
+
+            const textWidth = ctx.measureText(watermarkText).width;
+            const textHeight = fontSize;
+
+            // Random color generation
+            const randomColor = () => {
+              const colors = [
+                '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+                '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+                '#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#D7BDE2'
+              ];
+              return colors[Math.floor(Math.random() * colors.length)];
+            };
+
+            // Random position within image bounds
+            const margin = 30;
+            const maxX = width - textWidth - margin;
+            const maxY = height - textHeight - margin;
+            const minX = margin;
+            const minY = margin + textHeight;
+
+            const x = Math.random() * (maxX - minX) + minX;
+            const y = Math.random() * (maxY - minY) + minY;
+
+            // Random opacity between 0.6 and 0.9
+            const opacity = 0.6 + Math.random() * 0.3;
+
+            // Apply random color with opacity
+            const color = randomColor();
+            const r = parseInt(color.slice(1, 3), 16);
+            const g = parseInt(color.slice(3, 5), 16);
+            const b = parseInt(color.slice(5, 7), 16);
+
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.lineWidth = 2;
+
+            ctx.strokeText(watermarkText, x, y);
+            ctx.fillText(watermarkText, x, y);
+
+            console.log('Random watermark added:', {
+              color: `rgba(${r}, ${g}, ${b}, ${opacity.toFixed(2)})`,
+              position: `(${Math.round(x)}, ${Math.round(y)})`,
+              fontSize: `${fontSize.toFixed(1)}px`,
+              opacity: opacity.toFixed(2)
+            });
+
+            // Convert to WebP
+            canvas.toBlob((webpBlob) => {
+              if (webpBlob) {
+                // Generate unique filename preserving original name
+                const originalName = file.name.replace(/\.[^.]+$/, ''); // Remove extension
+                const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
+                const randomId = Math.random().toString(36).substring(2, 8);
+                const newFilename = `${originalName}_${timestamp}_${randomId}.webp`;
+
+                // Create a new File from the WebP blob
+                const optimizedFile = new File([webpBlob], newFilename, {
+                  type: 'image/webp',
+                  lastModified: Date.now()
+                });
+
+                console.log('WebP conversion successful, new size:', webpBlob.size);
+                console.log('Generated filename:', newFilename);
+                resolve(optimizedFile);
+              } else {
+                reject(new Error('Failed to convert to WebP'));
+              }
+            }, 'image/webp', 0.8);
+
+          } catch (error) {
+            reject(error);
+          }
+        };
+
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = URL.createObjectURL(file);
+      });
+    }
+
     // --- Upload Modal Functions ---
     function showUploadModal() {
       uploadModal.style.display = 'block';
@@ -353,6 +467,7 @@
     }
     function resetUploadModal() {
       selectedFile = null;
+      processedFile = null;
       detectionResult = null;
       detectRunToken++; // cancel ongoing detection
       previewContainer.style.display = 'none';
@@ -397,29 +512,42 @@
       selectedFile = file;
       hideUploadStatus();
 
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        // Show preview
-        previewImage.src = e.target.result;
-        previewContainer.style.display = 'block';
+      try {
+        showUploadStatus('Resim optimize ediliyor...', 'uploading');
 
-        // Fit overlay after image loads to the new size
-        previewImage.onload = () => { fitOverlayToImage(); drawBoxes([]); };
+        // First optimize the image
+        const optimizedFile = await optimizeImage(file);
+        processedFile = optimizedFile;
 
-        showUploadStatus('Kedi tespiti yapılıyor...', 'uploading');
-        const result = await detectCat(previewImage);
-        if (result && !result.cancelled) {
-          detectionResult = result;
-          hideUploadStatus();
-          showDetectionResults(result);
-        }
-      };
-      reader.readAsDataURL(file);
+        console.log('Image optimized:', optimizedFile.size, 'bytes');
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          // Show preview of the optimized image
+          previewImage.src = e.target.result;
+          previewContainer.style.display = 'block';
+
+          // Fit overlay after image loads to the new size
+          previewImage.onload = () => { fitOverlayToImage(); drawBoxes([]); };
+
+          showUploadStatus('Kedi tespiti yapılıyor...', 'uploading');
+          const result = await detectCat(previewImage);
+          if (result && !result.cancelled) {
+            detectionResult = result;
+            hideUploadStatus();
+            showDetectionResults(result);
+          }
+        };
+        reader.readAsDataURL(optimizedFile);
+      } catch (error) {
+        console.error('Image optimization failed:', error);
+        showUploadStatus('Resim işleme hatası: ' + error.message, 'error');
+      }
     }
 
     async function uploadFile() {
-      if (!selectedFile || !detectionResult) {
-        showUploadStatus('Lütfen önce bir dosya seçin ve tespit tamamlansın', 'error');
+      if (!processedFile || !detectionResult) {
+        showUploadStatus('Lütfen önce bir dosya seçin ve işleme tamamlansın', 'error');
         return;
       }
       showUploadStatus('Dosya yükleniyor...', 'uploading');
@@ -427,7 +555,7 @@
 
       try {
         const formData = new FormData();
-        formData.append('image', selectedFile);
+        formData.append('image', processedFile);
         formData.append('detectionResult', JSON.stringify(detectionResult));
 
         const response = await fetch(UPLOAD_URL, { method: 'POST', body: formData });

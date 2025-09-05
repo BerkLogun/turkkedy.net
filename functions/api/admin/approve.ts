@@ -14,7 +14,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       return new Response("Unauthorized", { status: 401 });
     }
 
-    const { action, key } = await request.json();
+    const body = await request.json() as { action?: string; key?: string };
+    const { action, key } = body;
 
     if (!action || !key) {
       return new Response(JSON.stringify({ 
@@ -96,11 +97,9 @@ async function processAndApproveImage(
   imageBuffer: ArrayBuffer, 
   contentType: string
 ): Promise<string> {
-  // Generate approved filename with .webp extension for consistency
-  const timestamp = Date.now();
-  const randomSuffix = Math.random().toString(36).substring(2, 15);
-  const approvedFilename = `user_${timestamp}_${randomSuffix}.webp`;
-  const approvedKey = `cats/${approvedFilename}`;
+  // Keep the original filename but move from pending/ to cats/ directory
+  const originalFilename = pendingKey.replace('pending/', '');
+  const approvedKey = `cats/${originalFilename}`;
   
   try {
     // Basic image processing - resize and convert to WebP
@@ -114,7 +113,7 @@ async function processAndApproveImage(
       },
       customMetadata: {
         source: 'user_upload',
-        approvedTime: timestamp.toString(),
+        approvedTime: Date.now().toString(),
         originalContentType: contentType
       }
     });
@@ -127,20 +126,19 @@ async function processAndApproveImage(
     console.error('Image processing failed, storing original:', error);
     
     // Fallback: store original image if processing fails
-    const fallbackKey = `cats/user_${timestamp}_${randomSuffix}_original.${getFileExtension(contentType)}`;
-    await env.cats.put(fallbackKey, imageBuffer, {
+    await env.cats.put(approvedKey, imageBuffer, {
       httpMetadata: {
         contentType: contentType,
         cacheControl: 'public, max-age=31536000'
       },
       customMetadata: {
         source: 'user_upload_original',
-        approvedTime: timestamp.toString()
+        approvedTime: Date.now().toString()
       }
     });
 
     await env.cats.delete(pendingKey);
-    return fallbackKey;
+    return approvedKey;
   }
 }
 

@@ -13,18 +13,27 @@ export const onRequest: PagesFunction<Env> = async ({ request, env, params }) =>
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const key = params.key as string;
+  const key = decodeURIComponent(params.key as string);
   if (!key) {
     return new Response("Missing key", { status: 400 });
   }
 
   try {
+    console.log('Looking for image with key:', key);
     const obj = await env.cats.get(key);
     if (!obj) {
+      console.log('Image not found for key:', key);
       return new Response("Image not found", { status: 404 });
     }
+    console.log('Image found, size:', obj.size);
 
-    const headers = new Headers(obj.httpMetadata ?? {});
+    const headers = new Headers();
+    if (obj.httpMetadata?.contentType) {
+      headers.set("content-type", obj.httpMetadata.contentType);
+    }
+    if (obj.httpMetadata?.cacheControl) {
+      headers.set("cache-control", obj.httpMetadata.cacheControl);
+    }
     headers.set("cache-control", "no-cache, no-store, must-revalidate");
     headers.set("access-control-allow-origin", "*");
 

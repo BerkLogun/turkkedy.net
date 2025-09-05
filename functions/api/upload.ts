@@ -1,210 +1,175 @@
 /// <reference types="@cloudflare/workers-types" />
 
 interface Env {
-  cats: R2Bucket;
-  ADMIN_TOKEN: string;
+  cats: R2Bucket;            // MUST be bound in Pages settings as "cats"
+  ADMIN_TOKEN?: string;
 }
 
 interface DetectionResult {
   hasCat: boolean;
   confidence: number;
-  message: string;
-  status: string;
-  prediction?: any;
+  message?: string;
+  status?: string;
+  prediction?: unknown;
 }
+
+const CORS_HEADERS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "POST, OPTIONS",
+  "access-control-allow-headers": "content-type, authorization",
+  "access-control-max-age": "86400",
+};
+
+export const onRequestOptions: PagesFunction<Env> = async () => {
+  return new Response(null, { headers: CORS_HEADERS });
+};
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   try {
+    // --- Safety: ensure R2 binding exists
+    if (!env.cats || typeof env.cats.put !== "function") {
+      return json(
+        { error: "R2 binding 'cats' is not configured for this Pages project." },
+        500
+      );
+    }
+
+    // Parse multipart form-data
     const formData = await request.formData();
-    const imageFile = formData.get('image') as File;
-    const detectionResultStr = formData.get('detectionResult') as string;
+    const imageFile = formData.get("image");
+    const detectionResultStr = formData.get("detectionResult");
 
-    if (!imageFile) {
-      return new Response(JSON.stringify({ error: 'No image file provided' }), {
-        status: 400,
-        headers: { 'content-type': 'application/json' }
-      });
+    if (!(imageFile instanceof File)) {
+      return json({ error: "No image file provided" }, 400);
+    }
+    if (typeof detectionResultStr !== "string" || detectionResultStr.length === 0) {
+      return json({ error: "No detection result provided" }, 400);
     }
 
-    if (!detectionResultStr) {
-      return new Response(JSON.stringify({ error: 'No detection result provided' }), {
-        status: 400,
-        headers: { 'content-type': 'application/json' }
-      });
-    }
-
+    // Parse detection result
     let detectionResult: DetectionResult;
     try {
-      detectionResult = JSON.parse(detectionResultStr);
+      detectionResult = JSON.parse(detectionResultStr) as DetectionResult;
     } catch {
-      return new Response(JSON.stringify({ error: 'Invalid detection result format' }), {
-        status: 400,
-        headers: { 'content-type': 'application/json' }
-      });
+      return json({ error: "Invalid detection result format" }, 400);
     }
 
     // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(imageFile.type)) {
-      return new Response(JSON.stringify({ 
-        error: 'Invalid file type. Only JPG, PNG, and WebP are allowed.' 
-      }), {
-        status: 400,
-        headers: { 'content-type': 'application/json' }
-      });
+    const allowedTypes = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+    const mime = imageFile.type || "application/octet-stream";
+    if (!allowedTypes.has(mime)) {
+      return json({ error: "Invalid file type. Only JPG, PNG, and WebP are allowed." }, 400);
     }
 
-    // Validate file size (max 10MB)
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (imageFile.size > maxSize) {
-      return new Response(JSON.stringify({ 
-        error: 'File too large. Maximum size is 10MB.' 
-      }), {
-        status: 400,
-        headers: { 'content-type': 'application/json' }
-      });
+    // Validate file size (10MB limit; matches Workers limit)
+    const maxSize = 10 * 1024 * 1024;
+    const size = imageFile.size;
+    if (size > maxSize) {
+      return json({ error: "File too large. Maximum size is 10MB." }, 400);
     }
 
-    // Generate unique filename
-    const timestamp = Date.now();
-    const randomSuffix = Math.random().toString(36).substring(2, 15);
-    const fileExtension = imageFile.name.split('.').pop() || 'jpg';
-    const filename = `user_${timestamp}_${randomSuffix}.${fileExtension}`;
-    const key = `pending/${filename}`;
+    // Auto-approve decision (match your frontend threshold)
+    const AUTO_THRESHOLD = 0.80; // adjust if you changed the frontend value
+    const hasCat = !!detectionResult.hasCat;
+    const confidence = Number(detectionResult.confidence) || 0;
+    const autoApproved = hasCat && confidence >= AUTO_THRESHOLD;
 
-    // Store the image in R2
-    const imageBuffer = await imageFile.arrayBuffer();
-    await env.cats.put(key, imageBuffer, {
-      httpMetadata: {
-        contentType: imageFile.type,
-        cacheControl: 'public, max-age=31536000'
-      },
-      customMetadata: {
-        originalName: imageFile.name,
-        uploadTime: timestamp.toString(),
-        detectionResult: detectionResultStr,
-        confidence: detectionResult.confidence.toString(),
-        hasCat: detectionResult.hasCat.toString()
+    // Use the original filename from the processed image (already contains timestamp and ID)
+    // The frontend has already generated a proper filename with original name + unique ID
+    const originalName = imageFile.name;
+    let key = autoApproved ? originalName : `pending/${originalName}`;
+
+    // Prepare metadata
+    const httpMetadata: R2HTTPMetadata = {
+      contentType: 'image/webp', // Frontend converts everything to WebP
+      cacheControl: "public, max-age=31536000",
+    };
+    const customMetadata: Record<string, string> = {
+      source: "user_upload",
+      originalName: imageFile.name,
+      uploadTime: String(Date.now()),
+      detectionResult: detectionResultStr,     // keep the raw JSON string
+      confidence: confidence.toString(),
+      hasCat: hasCat.toString(),
+      status: autoApproved ? "approved" : "pending",
+    };
+
+    // Process and optimize the image
+    const originalBuffer = await imageFile.arrayBuffer();
+    const processedBuffer = await optimizeImage(originalBuffer, imageFile.type);
+
+    // Image is already processed on frontend, just upload as-is
+    const finalSize = processedBuffer.byteLength;
+
+    // Upload the processed image
+    await env.cats.put(key, processedBuffer, { httpMetadata, customMetadata });
+
+    // Respond
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: autoApproved
+          ? "Fotoğraf başarıyla yüklendi ve otomatik onaylandı!"
+          : "Fotoğraf yüklendi ve admin onayı için bekliyor.",
+        autoApproved,
+        key,
+        size: finalSize,
+        contentType: 'image/webp',
+      }),
+      {
+        status: 200,
+        headers: {
+          "content-type": "application/json",
+          "x-upload-key": key,
+          "x-upload-size": String(finalSize),
+          "x-upload-mime": 'image/webp',
+          ...CORS_HEADERS,
+        },
       }
-    });
-
-    // Determine if auto-approval should happen
-    const CAT_CONFIDENCE_THRESHOLD = 0.7;
-    const autoApproved = detectionResult.hasCat && detectionResult.confidence >= CAT_CONFIDENCE_THRESHOLD;
-
-    if (autoApproved) {
-      // Process and move to approved location
-      const processedKey = await processAndApproveImage(env, key, imageBuffer, imageFile.type);
-      
-      return new Response(JSON.stringify({
-        success: true,
-        message: 'Fotoğraf başarıyla yüklendi ve otomatik onaylandı!',
-        autoApproved: true,
-        key: processedKey
-      }), {
-        headers: { 'content-type': 'application/json' }
-      });
-    } else {
-      // Store in pending for admin review
-      return new Response(JSON.stringify({
-        success: true,
-        message: 'Fotoğraf yüklendi ve admin onayı için bekliyor.',
-        autoApproved: false,
-        pendingKey: key
-      }), {
-        headers: { 'content-type': 'application/json' }
-      });
-    }
-
-  } catch (error) {
-    console.error('Upload error:', error);
-    return new Response(JSON.stringify({ 
-      error: 'Upload failed: ' + (error as Error).message 
-    }), {
+    );
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("Upload error:", error);
+    return new Response(JSON.stringify({ error: "Upload failed: " + msg }), {
       status: 500,
-      headers: { 'content-type': 'application/json' }
+      headers: { "content-type": "application/json", ...CORS_HEADERS },
     });
   }
 };
 
-async function processAndApproveImage(
-  env: Env, 
-  pendingKey: string, 
-  imageBuffer: ArrayBuffer, 
-  contentType: string
-): Promise<string> {
-  // Generate approved filename with .webp extension for consistency
-  const timestamp = Date.now();
-  const randomSuffix = Math.random().toString(36).substring(2, 15);
-  const approvedFilename = `user_${timestamp}_${randomSuffix}.webp`;
-  const approvedKey = `cats/${approvedFilename}`;
-  
-  try {
-    // Basic image processing - resize and convert to WebP
-    const processedBuffer = await processImage(imageBuffer, contentType);
-    
-    // Store processed image
-    await env.cats.put(approvedKey, processedBuffer, {
-      httpMetadata: {
-        contentType: 'image/webp',
-        cacheControl: 'public, max-age=31536000'
-      },
-      customMetadata: {
-        source: 'user_upload',
-        approvedTime: timestamp.toString(),
-        originalContentType: contentType
-      }
-    });
+// --- helpers ---
 
-    // Remove from pending
-    await env.cats.delete(pendingKey);
-
-    return approvedKey;
-  } catch (error) {
-    console.error('Image processing failed, storing original:', error);
-    
-    // Fallback: store original image if processing fails
-    const fallbackKey = `cats/user_${timestamp}_${randomSuffix}_original.${getFileExtension(contentType)}`;
-    await env.cats.put(fallbackKey, imageBuffer, {
-      httpMetadata: {
-        contentType: contentType,
-        cacheControl: 'public, max-age=31536000'
-      },
-      customMetadata: {
-        source: 'user_upload_original',
-        approvedTime: timestamp.toString()
-      }
-    });
-
-    await env.cats.delete(pendingKey);
-    return fallbackKey;
-  }
+function json(obj: unknown, status = 200): Response {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { "content-type": "application/json", ...CORS_HEADERS },
+  });
 }
 
-async function processImage(imageBuffer: ArrayBuffer, contentType: string): Promise<ArrayBuffer> {
-  // This is a simplified image processing function
-  // In a production environment, you'd want to use a proper image processing library
-  // For now, we'll return the original buffer and let the client handle optimization
-  
-  // TODO: Implement proper image processing with:
-  // - Resize to max 1600px
-  // - Convert to WebP format
-  // - Compress with quality 80
-  // - Add watermark if needed
-  
-  return imageBuffer;
-}
-
-function getFileExtension(contentType: string): string {
-  switch (contentType) {
-    case 'image/jpeg':
-    case 'image/jpg':
-      return 'jpg';
-    case 'image/png':
-      return 'png';
-    case 'image/webp':
-      return 'webp';
+function pickExtensionFromMime(mime: string, fallbackName?: string): string {
+  switch (mime) {
+    case "image/jpeg":
+    case "image/jpg":
+      return "jpg";
+    case "image/png":
+      return "png";
+    case "image/webp":
+      return "webp";
     default:
-      return 'jpg';
+      // last resort: use the original name's extension if present
+      if (fallbackName && fallbackName.includes(".")) {
+        return fallbackName.split(".").pop()!.toLowerCase();
+      }
+      return "bin";
   }
 }
+
+
+// Image processing moved to frontend - server just receives processed images
+async function optimizeImage(buffer: ArrayBuffer, mimeType: string): Promise<ArrayBuffer> {
+  // Since image processing is now done on the frontend,
+  // we just return the buffer as-is (it's already optimized)
+  console.log('Received optimized image from frontend:', mimeType, 'size:', buffer.byteLength);
+  return buffer;
+}
+
