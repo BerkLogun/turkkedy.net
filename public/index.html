@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
-  <title>turkkedy.net • Cats</title>
-  <meta name="description" content="endless cats on turkkedy.net" />
+  <title>turkkedy.net</title>
+  <meta name="description" content="yeah kediler" />
 
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://turkkedy.net/" />
-  <meta property="og:title" content="turkkedy.net • Cats" />
-  <meta property="og:description" content="endless cats on turkkedy.net" />
+  <meta property="og:title" content="turkkedy.net" />
+  <meta property="og:description" content="biz burada kedi paylasiyoruz" />
   <meta property="og:image" content="https://medias.turkkedy.net/cats/00001.webp" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
@@ -19,8 +19,8 @@
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image" />
   <meta property="twitter:url" content="https://turkkedy.net/" />
-  <meta property="twitter:title" content="turkkedy.net • Cats" />
-  <meta property="twitter:description" content="endless cats on turkkedy.net" />
+  <meta property="twitter:title" content="turkkedy.net" />
+  <meta property="twitter:description" content="biz burada kedi paylasiyoruz" />
   <meta property="twitter:image" content="https://medias.turkkedy.net/cats/00001.webp" />
 
   <!-- TensorFlow.js and COCO-SSD (defer load); add WASM backend for wider device support -->
@@ -66,6 +66,9 @@
     .preview-container { position: relative; margin: 20px 0; text-align: center; }
     .preview-image { max-width: 100%; max-height: 360px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
     .overlay-canvas { position:absolute; top:0; left:0; border-radius: 8px; pointer-events:none; }
+    .loading-indicator { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10; }
+    .loading-spinner { width: 48px; height: 48px; border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid var(--ok); border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
     .detection-results { margin: 15px 0; padding: 15px; background: rgba(255,255,255,0.05); border-radius: 8px; border-left: 4px solid var(--ok); }
     .detection-results.low-confidence { border-left-color: var(--warn); }
@@ -137,12 +140,15 @@
         <div class="upload-icon">📸</div>
         <div class="upload-text">Fotoğrafı buraya sürükleyin veya tıklayın</div>
         <div class="upload-hint">JPG, PNG, WebP formatları desteklenir</div>
-        <input type="file" id="fileInput" class="file-input" accept="image/*" />
+        <input type="file" id="fileInput" class="file-input" accept="image/webp,image/*" />
       </div>
 
       <div id="previewContainer" class="preview-container" style="display:none;">
         <img id="previewImage" class="preview-image" alt="Önizleme" />
         <canvas id="overlayCanvas" class="overlay-canvas"></canvas>
+        <div id="loadingIndicator" class="loading-indicator">
+          <div class="loading-spinner"></div>
+        </div>
       </div>
 
       <div id="detectionResults" class="detection-results" style="display:none;">
@@ -196,7 +202,7 @@
     const uploadModal = $('uploadModal'), closeModal = $('closeModal'),
           uploadArea = $('uploadArea'), fileInput = $('fileInput'),
           previewContainer = $('previewContainer'), previewImage = $('previewImage'),
-          overlayCanvas = $('overlayCanvas'),
+          overlayCanvas = $('overlayCanvas'), loadingIndicator = $('loadingIndicator'),
           detectionResults = $('detectionResults'), confidenceScore = $('confidenceScore'),
           detectionMessage = $('detectionMessage'), uploadStatus = $('uploadStatus'),
           cancelUpload = $('cancelUpload'), submitUpload = $('submitUpload');
@@ -509,6 +515,7 @@
       detectRunToken++; // cancel ongoing detection
       previewContainer.style.display = 'none';
       overlayCanvas.getContext('2d').clearRect(0,0,overlayCanvas.width, overlayCanvas.height);
+      loadingIndicator.style.display = 'none';
       detectionResults.style.display = 'none';
       uploadStatus.style.display = 'none';
       submitUpload.style.display = 'none';
@@ -551,6 +558,7 @@
 
       try {
         showUploadStatus('Resim optimize ediliyor...', 'uploading');
+        loadingIndicator.style.display = 'block';
 
         // First optimize the image
         const optimizedFile = await optimizeImage(file);
@@ -571,6 +579,7 @@
           const result = await detectCat(previewImage);
           if (result && !result.cancelled) {
             detectionResult = result;
+            loadingIndicator.style.display = 'none';
             hideUploadStatus();
             showDetectionResults(result);
           }
@@ -578,6 +587,7 @@
         reader.readAsDataURL(optimizedFile);
       } catch (error) {
         console.error('Image optimization failed:', error);
+        loadingIndicator.style.display = 'none';
         showUploadStatus('Resim işleme hatası: ' + error.message, 'error');
       }
     }
@@ -588,6 +598,7 @@
         return;
       }
       showUploadStatus('Dosya yükleniyor...', 'uploading');
+      loadingIndicator.style.display = 'block';
       submitUpload.disabled = true;
 
       try {
@@ -600,15 +611,18 @@
         try { result = await response.json(); } catch {}
 
         if (response.ok) {
+          loadingIndicator.style.display = 'none';
           showUploadStatus(result.message || 'Yükleme başarılı', 'success');
           setTimeout(() => {
             hideUploadModal();
             if (result && result.autoApproved) location.reload();
           }, 1200);
         } else {
+          loadingIndicator.style.display = 'none';
           showUploadStatus(result.error || 'Yükleme hatası', 'error');
         }
       } catch (error) {
+        loadingIndicator.style.display = 'none';
         showUploadStatus('Yükleme hatası: ' + error.message, 'error');
       } finally {
         submitUpload.disabled = false;

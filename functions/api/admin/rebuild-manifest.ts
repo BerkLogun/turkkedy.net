@@ -11,7 +11,7 @@ export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   const exts = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"]);
-  const out: string[] = [];
+  const out: { key: string; uploaded: Date }[] = [];
   const prefix = url.searchParams.get('prefix') || undefined;
 
   let cursor: string | undefined;
@@ -20,16 +20,24 @@ export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
       const list = await env.cats.list({ cursor, limit: 1000, prefix });
       for (const o of list.objects ?? []) {
         const k = o.key;
+        // Skip files in folders (containing "/")
+        if (/(^|\/)pending(\/|$)/i.test(k)) continue;
         const dot = k.lastIndexOf(".");
-        if (dot > -1 && exts.has(k.slice(dot).toLowerCase())) out.push(k);
+        if (dot > -1 && exts.has(k.slice(dot).toLowerCase())) {
+          out.push({ key: k, uploaded: o.uploaded });
+        }
       }
       cursor = list.truncated ? list.cursor : undefined;
     } while (cursor);
 
-    out.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    // Sort by upload date: oldest to newest (so last item is newest)
+    out.sort((a, b) => a.uploaded.getTime() - b.uploaded.getTime());
+
+    // Extract just the keys for the manifest
+    const manifestKeys = out.map(item => item.key);
 
     // Save to R2 as manifest.json
-    const body = JSON.stringify(out);
+    const body = JSON.stringify(manifestKeys);
     await env.cats.put('manifest.json', body, {
       httpMetadata: {
         contentType: "application/json; charset=utf-8",

@@ -9,6 +9,7 @@ interface ImageData {
   key: string;
   filename: string;
   inManifest: boolean;
+  uploaded: Date;
 }
 
 export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
@@ -65,15 +66,22 @@ export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
         allImages.push({
           key: obj.key,
           filename: obj.key,
-          inManifest: inManifest
+          inManifest: inManifest,
+          uploaded: obj.uploaded
         });
       }
 
       cursor = list.truncated ? list.cursor : undefined;
     } while (cursor);
 
-    // Sort images (newest first - by key name which typically includes timestamp)
-    allImages.sort((a, b) => b.key.localeCompare(a.key));
+    // Sort images (not in manifest first, then newest first by upload date)
+    allImages.sort((a, b) => {
+      // Prioritize images not in manifest
+      if (!a.inManifest && b.inManifest) return -1;
+      if (a.inManifest && !b.inManifest) return 1;
+      // Within same manifest status, sort by upload date (newest first)
+      return b.uploaded.getTime() - a.uploaded.getTime();
+    });
 
     // Apply pagination
     const paginatedImages = allImages.slice(offset, offset + limit);

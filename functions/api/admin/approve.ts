@@ -99,7 +99,7 @@ async function processAndApproveImage(
 ): Promise<string> {
   // Keep the original filename but move from pending/ to cats/ directory
   const originalFilename = pendingKey.replace('pending/', '');
-  const approvedKey = `cats/${originalFilename}`;
+  const approvedKey = `${originalFilename}`;
   
   try {
     // Basic image processing - resize and convert to WebP
