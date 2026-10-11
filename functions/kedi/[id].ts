@@ -16,11 +16,19 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params, w
   const url = new URL(request.url);
 
   if (ref === "rastgele") {
-    const total = await liveCount(env.DB);
-    const row = total ? await getByPos(env.DB, Math.floor(Math.random() * total)) : null;
+    let targetId: number | null = null;
+    try {
+      const total = await liveCount(env.DB);
+      const row = total ? await getByPos(env.DB, Math.floor(Math.random() * total)) : null;
+      targetId = row?.id ?? null;
+    } catch (e) {
+      if (!isD1Outage(e)) throw e;
+      const all = await readSnapshot(env);
+      targetId = all.length ? all[Math.floor(Math.random() * all.length)][0] : null;
+    }
     return new Response(null, {
       status: 302,
-      headers: { location: row ? `${url.origin}/kedi/${row.id}` : `${url.origin}/`, "cache-control": "no-store", "x-robots-tag": "noindex" },
+      headers: { location: targetId ? `${url.origin}/kedi/${targetId}` : `${url.origin}/`, "cache-control": "no-store", "x-robots-tag": "noindex" },
     });
   }
 
