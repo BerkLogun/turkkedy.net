@@ -1,6 +1,22 @@
 {
+  "name": "turkkedy",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev --port 8788",
+    "stamp": "node tools/stamp.mjs",
+    "predeploy": "npm run stamp",
+    "predeploy:preview": "npm run stamp",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "wrangler d1 migrations apply turkkedy --remote",
+    "db:migrate:local": "wrangler d1 migrations apply turkkedy --local",
+    "db:seed": "node tools/seed-from-manifest.mjs manifest.json > .seed.sql && wrangler d1 execute turkkedy --remote --file .seed.sql",
+    "deploy": "wrangler pages deploy --branch production",
+    "deploy:preview": "wrangler pages deploy --branch revamp"
+  },
   "devDependencies": {
-    "@types/node": "^24.3.0",
-    "@cloudflare/workers-types": "^4.20241025.0"
+    "@cloudflare/workers-types": "^5.20261006.1",
+    "typescript": "^5.6.0",
+    "wrangler": "^4.149.0"
   }
 }

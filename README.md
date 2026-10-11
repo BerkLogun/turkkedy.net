@@ -1,228 +1,90 @@
-# 🐱 Random Cat Photos App
+# turkkedy.net
 
-A delightful web application that serves random cat photos with a modern, responsive interface. Built on Cloudflare's edge network for lightning-fast global performance.
+Endless cats. A single-page viewer on Cloudflare Pages, images in R2, index in D1, cat detection by Workers AI. Runs entirely on Cloudflare's free tiers.
 
-## ✨ Features
-
-- **Random Cat Photos**: Endless stream of adorable cat images
-- **Responsive Design**: Mobile-first design that works on all devices
-- **Fast Performance**: Served from Cloudflare's global edge network
-- **Simple Interface**: Clean, intuitive UI with one-click random photo generation
-- **Social Media Ready**: Open Graph and Twitter Card support for sharing
-- **Progressive Web App**: Works offline and can be installed on devices
-
-## 🚀 Live Demo
-
-Visit [turkkedy.net](https://turkkedy.net) to see the app in action!
-
-## 🏗️ Architecture
-
-This app is built using Cloudflare's modern web platform:
-
-- **Frontend**: Static HTML/CSS/JavaScript served from Cloudflare Pages
-- **Backend**: Cloudflare Workers (Edge Functions) for API endpoints
-- **Storage**: Cloudflare R2 for image storage and CDN
-- **Deployment**: Automatic deployment via Cloudflare Pages
-
-## 🛠️ Tech Stack
-
-- **Frontend**: Vanilla JavaScript, CSS3, HTML5
-- **Backend**: Cloudflare Workers (TypeScript)
-- **Storage**: Cloudflare R2 Object Storage
-- **CDN**: Cloudflare's global edge network
-- **Deployment**: Cloudflare Pages
-
-## 📁 Project Structure
+## How it works
 
 ```
-turkkedy.net/
-├── public/                 # Static assets for Cloudflare Pages
-│   └── index.html         # Main application
-├── functions/             # Cloudflare Workers (Edge Functions)
-│   └── api/
-│       ├── manifest.ts    # Serves the image manifest
-│       └── admin/         # Admin endpoints
-├── cats/                  # Source cat images
-├── wrangler.toml          # Cloudflare configuration
-├── package.json           # Dependencies
-└── upload_cats.py         # Image upload script
+public/            static site (viewer, upload dialog, admin panel)
+functions/         Pages Functions (the API)
+  api/cats         GET  /api/cats?page=N      100 live cats per page, edge-cached 2 min
+  api/cats/[id]    GET  /api/cats/:id         one cat (used by share links)
+  api/upload       POST /api/upload           validate → classify (Workers AI) → R2 → D1
+  api/admin/*      Bearer-token protected: images, review, delete, sync
+  p/[key]          GET  /p/:id                share page with Open Graph tags (old link formats still resolve)
+  r2/[[path]]      GET  /r2/:key              bucket passthrough, only used in local dev
+lib/               code shared by the functions
+migrations/        D1 schema
+tools/             bulk tooling (optimize.py, upload_cats.py, seed-from-manifest.mjs)
 ```
 
-## 🚀 Getting Started
+**Data flow.** The D1 table `cats` is the index: one row per object, with a dense `pos` column (0..N-1) for live cats. The viewer asks for `page = floor(pos / 100)` and reads only that page. Uploads and approvals insert/update rows directly, so nothing needs to be rebuilt. `POST /api/admin/sync` reconciles D1 with the bucket if they ever drift.
 
-### Prerequisites
+**Uploads.** The browser resizes to ≤1600px, stamps the watermark, encodes WebP (JPEG on Safari, which cannot encode WebP) and also sends a 320px JPEG thumbnail. The function sniffs the header; anything that is not already a ≤1600px WebP is converted server-side through Cloudflare Image Transformations (`/cdn-cgi/image/...` on the CDN host, free up to 5,000 unique transformations a month). It then hashes the bytes (the hash is the object key, so duplicates are free), classifies the thumbnail with `@cf/microsoft/resnet-50`, and stores it as live (confidence ≥ 0.5), pending (≥ 0.08) or rejects it. Thresholds live in `lib/classify.ts`.
 
-1. **Cloudflare Account**: Sign up at [cloudflare.com](https://cloudflare.com)
-2. **Wrangler CLI**: Install the Cloudflare CLI tool
-3. **Node.js**: Version 18 or higher
+Server-side conversion requires **Images → Transformations → enabled for the turkkedy.net zone** in the dashboard. While it is off, uploads are stored in whatever format the browser produced (the response carries `converted: false`).
 
-### Installation
+## Development
 
-1. **Clone the repository**
-   ```bash
-   git clone <your-repo-url>
-   cd turkkedy.net
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Install Wrangler CLI**
-   ```bash
-   npm install -g wrangler
-   ```
-
-4. **Authenticate with Cloudflare**
-   ```bash
-   wrangler auth login
-   ```
-
-### Configuration
-
-1. **Update `wrangler.toml`**
-   ```toml
-   name = "your-app-name"
-   compatibility_date = "2024-10-01"
-   
-   [[r2_buckets]]
-   binding = "cats"
-   bucket_name = "your-bucket-name"
-   
-   [vars]
-   CDN_BASE = "https://your-cdn-domain.com"
-   SITE_BASE = "https://your-domain.com"
-   ```
-
-2. **Create R2 bucket**
-   - Go to Cloudflare Dashboard → R2 Object Storage
-   - Create a new bucket named `cats` (or your preferred name)
-   - Configure public access if desired
-
-### Upload Cat Images
-
-1. **Place cat images in the `cats/` directory**
-   - Supported formats: JPG, PNG, GIF, WebP, AVIF, BMP, TIFF
-   - Images will be automatically optimized and watermarked
-
-2. **Run the upload script**
-   ```bash
-   # Dry run to preview
-   python3 upload_cats.py --dry-run
-   
-   # Upload with progress
-   python3 upload_cats.py --progress
-   ```
-
-3. **Generate manifest**
-   ```bash
-   python3 generate_manifest.py
-   ```
-
-### Deploy
-
-1. **Deploy to Cloudflare Pages**
-   ```bash
-   wrangler pages deploy public
-   ```
-
-2. **Or connect your GitHub repository**
-   - Push your code to GitHub
-   - Connect the repository in Cloudflare Pages dashboard
-   - Enable automatic deployments
-
-## 🔧 Development
-
-### Local Development
-
-1. **Start local development server**
-   ```bash
-   wrangler pages dev public
-   ```
-
-2. **Test Edge Functions locally**
-   ```bash
-   wrangler dev
-   ```
-
-### Adding New Features
-
-- **Frontend**: Edit files in `public/` directory
-- **API**: Add new endpoints in `functions/api/`
-- **Styling**: Modify CSS in `public/index.html`
-
-## 📱 API Endpoints
-
-### `/api/manifest`
-- **GET**: Returns the list of available cat images
-- **Response**: JSON array of image metadata
-- **Cache**: 5 minutes at edge
-
-### `/api/admin/rebuild-manifest`
-- **GET**: Rebuilds the image manifest (admin only)
-- **Query**: `?key=<admin-key>`
-
-## 🎨 Customization
-
-### Styling
-The app uses CSS custom properties for easy theming:
-```css
-:root {
-  --bg: #0f1115;      /* Background color */
-  --fg: #e6e6e6;      /* Foreground/text color */
-  --muted: #9aa0a6;   /* Muted/secondary color */
-  --btn: #1f232b;     /* Button background */
-  --btnh: #2a2f3a;    /* Button hover */
-}
+```bash
+npm install
+npm run db:migrate:local          # create the local D1 schema
+npm run dev                       # http://localhost:8788 (uses .dev.vars: ADMIN_TOKEN=local-dev-token, images via /r2)
+npm run typecheck
 ```
 
-### Images
-- **Source**: Place images in `cats/` directory
-- **Optimization**: Images are automatically optimized with watermarks
-- **Formats**: Supports all major image formats
-- **Naming**: Use sequential numbers (00001.webp, 00002.webp, etc.)
+Locally the bucket is empty, so upload a few cats through the UI to have something to look at. The admin panel is at `/admin/`.
 
-## 🚀 Performance
+## Deploy
 
-- **Edge Caching**: Images cached at Cloudflare's global edge
-- **Optimized Images**: WebP format with optimal compression
-- **Lazy Loading**: Images loaded on-demand
-- **CDN**: Global distribution for fast loading worldwide
+```bash
+npm run db:migrate                # apply migrations to the production D1
+npm run deploy:preview            # https://revamp.cats-daa.pages.dev
+npm run deploy                    # production → turkkedy.net
+```
 
-## 🔒 Security
+Both deploy scripts first run `npm run stamp`, which rewrites asset references as `/app.js?v=<hash>` so browsers pick up new CSS/JS immediately (assets are cached for a year). If you deploy with `wrangler pages deploy` directly, run `npm run stamp` first.
 
-- **Admin Protection**: Manifest rebuild requires admin key
-- **CORS**: Proper CORS headers for API endpoints
-- **Input Validation**: All inputs are validated and sanitized
-- **HTTPS Only**: Served over secure HTTPS connections
+Bindings (R2 `cats`, D1 `turkkedy`, Workers AI) come from `wrangler.toml`. The only secret is set once:
 
-## 📊 Monitoring
+```bash
+npx wrangler pages secret put ADMIN_TOKEN --project-name cats
+```
 
-- **Cloudflare Analytics**: Built-in performance monitoring
-- **Error Tracking**: Automatic error logging and reporting
-- **Performance Metrics**: Core Web Vitals tracking
+### One-time migration from the old manifest
 
-## 🤝 Contributing
+```bash
+curl -s https://turkkedy.net/api/manifest > manifest.json   # from the old deployment
+npm run db:seed                                             # positions follow manifest order
+```
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+Then open `/admin/` and press **Eşitle** once to pull real upload dates and any pending objects from the bucket.
 
-## 📄 License
+## SEO
 
-This project is open source and available under the [MIT License](LICENSE).
+Every live cat has its own server-rendered page at `/kedi/<id>` (unique title, description, Open Graph/Twitter tags, JSON-LD `ImageObject`, prev/next links and a strip of neighbours). `/sitemap.xml` is a sitemap index over `/sitemaps/cats-N.xml` chunks of 1000 URLs with image extensions. Old `/p/...` share links 301 to the new pages. Submit `https://turkkedy.net/sitemap.xml` in Google Search Console once.
 
-## 🙏 Acknowledgments
+Pages read much better with a caption, so the admin panel has **Açıklama üret**: it writes a one-line Turkish description for cats that have none, five at a time, using Workers AI (LLaVA describes, Llama 3.1 translates; thresholds and prompts in `lib/classify.ts`). The free Workers AI quota is daily, so expect to run it over a few days for the whole archive. Llama 3.2 Vision would do it in one call with better Turkish, but Cloudflare requires accepting Meta's license on the account first; flip `USE_LLAMA_VISION` after doing that in the dashboard playground.
 
-- **Cloudflare**: For the amazing edge computing platform
-- **Cat Owners**: For sharing their adorable feline friends
-- **Open Source Community**: For the tools and libraries that make this possible
+### Image caching
 
----
+Objects uploaded through the site carry `cache-control: public, max-age=31536000, immutable`. For everything uploaded earlier, add a Cache Rule in the Cloudflare dashboard for the zone: *hostname equals `medias.turkkedy.net` → Eligible for cache, Edge TTL 1 month, Browser TTL 1 year*. Without it every image view goes to R2.
 
-Made with ❤️ and lots of 🐱 by [Berk Logun](https://github.com/BerkLogun)
+## Security notes
 
-*Enjoy the endless stream of cat photos!* 🎉
+- Admin routes need `Authorization: Bearer <ADMIN_TOKEN>` (constant-time compare, no query-string tokens). Use a long random token.
+- Uploads awaiting moderation live in the private bucket `cats-pending`; only approved images reach the public bucket. The admin panel previews them through `/api/admin/image/:id` with the token.
+- Every HTML response carries CSP, HSTS, nosniff, frame and referrer headers (`public/_headers` for static files, `SECURITY_HEADERS` for functions). `404.html` keeps unknown paths from returning the homepage.
+- Upload validation is server-side: size caps, header sniffing, server-side re-encoding, duplicate hashing, AI classification. Rejected files are never stored.
+- Upload rate limiting is built in (`lib/ratelimit.ts`, D1 table `upload_rate`): 6 attempts per hashed IP per 10 minutes and 200 per day site-wide, so a script cannot burn the daily Workers AI / Images quotas. Limits are constants at the top of that file.
+- **Turnstile** (free): create a widget for turkkedy.net, put the site key in `wrangler.toml` as `TURNSTILE_SITE_KEY`, and set the secret with `npx wrangler pages secret put TURNSTILE_SECRET --project-name cats`. The upload dialog then shows the check and the server verifies it. With no secret set, the check is skipped.
+
+## Bulk upload from a folder
+
+```bash
+pip install pillow
+python3 tools/optimize.py input output --wm-text turkkedy.net --wm-shadow
+python3 tools/upload_cats.py --source-dir output --progress
+```
+
+then **Eşitle** in the admin panel to index them.

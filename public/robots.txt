@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /kedi/rastgele
+Allow: /gizlilik/
+
+Sitemap: https://turkkedy.net/sitemap.xml

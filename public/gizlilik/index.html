@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Gizlilik ve KVKK · turkkedy.net</title>
+  <meta name="description" content="turkkedy.net gizlilik politikası ve KVKK aydınlatma metni: hangi veriler işlenir, neden, ne kadar saklanır ve haklarınız.">
+  <link rel="canonical" href="https://turkkedy.net/gizlilik/">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <meta name="color-scheme" content="dark">
+  <style>
+    .legal { max-width: 720px; }
+    .legal h1 { font-size: clamp(22px, 3vw, 30px); letter-spacing: -0.02em; margin: 0 0 6px; }
+    .legal h2 { font-size: 17px; margin: 30px 0 8px; letter-spacing: -0.01em; }
+    .legal p, .legal li { color: #c9c8c3; font-size: 15px; line-height: 1.6; }
+    .legal ul { padding-left: 20px; }
+    .legal a { color: var(--fg); }
+    .legal .lead { color: var(--muted); margin-bottom: 24px; }
+    .legal dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; font-size: 15px; }
+    .legal dt { color: var(--muted); }
+    .legal dd { margin: 0; color: #c9c8c3; }
+    @media (max-width: 520px) { .legal dl { grid-template-columns: 1fr; gap: 2px; } .legal dd { margin-bottom: 8px; } }
+  </style>
+</head>
+<body class="page">
+  <header class="top">
+    <a class="brand" href="/" aria-label="turkkedy.net ana sayfa">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V9.5c0-.7.8-1.1 1.4-.7L8 10.6c1.2-.9 2.6-1.3 4-1.3s2.8.4 4 1.3l2.6-1.8c.6-.4 1.4 0 1.4.7V20"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"/><circle cx="9.5" cy="15" r=".9" fill="currentColor" stroke="none"/><circle cx="14.5" cy="15" r=".9" fill="currentColor" stroke="none"/></svg>
+      <span>turkkedy<em>.net</em></span>
+    </a>
+  </header>
+
+  <main class="page-wrap legal">
+    <h1>Gizlilik politikası ve KVKK aydınlatma metni</h1>
+    <p class="lead">Son güncelleme: 12 Ekim 2026. Kısa versiyon: hesap yok, çerez yok, reklam yok, takip yok. Sadece yüklediğin kedi fotoğrafları ve altyapının çalışması için gereken teknik veriler.</p>
+
+    <h2>1. Veri sorumlusu</h2>
+    <p>turkkedy.net, Berk tarafından kişisel bir hobi projesi olarak işletilmektedir. 6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) kapsamında veri sorumlusu site işletmecisidir. İletişim: <a href="https://berk.kim" rel="me noopener" target="_blank">berk.kim</a>.</p>
+
+    <h2>2. Hangi veriler, hangi amaçla, hangi hukuki sebeple?</h2>
+    <dl>
+      <dt>Yüklediğin fotoğraf</dt>
+      <dd>Sitede herkese açık olarak yayınlanmak üzere saklanır. Tarayıcında küçültülür, üstüne "turkkedy.net" filigranı eklenir ve WebP formatına çevrilir; sunucuya bu işlenmiş hali gider. Hukuki sebep: açık rızan (KVKK m.5/1). Fotoğrafı yükleyerek yayınlanmasına rıza göstermiş olursun.</dd>
+      <dt>Dosya adı ve yükleme zamanı</dt>
+      <dd>Yönetim ve sıralama için kaydedilir. Dosya adı herkese açık gösterilmez.</dd>
+      <dt>Yapay zekâ sınıflandırması</dt>
+      <dd>Fotoğrafın küçük bir kopyası, içinde kedi olup olmadığını anlamak için Cloudflare Workers AI üzerinde bir görüntü sınıflandırma modeline gönderilir. Sonuç (ör. "kedi, %91") kaydedilir. Yayınlanmış fotoğraflar için ayrıca kısa bir Türkçe açıklama üretilebilir. Model eğitiminde kullanılmaz.</dd>
+      <dt>Teknik veriler (IP adresi, tarayıcı bilgisi)</dt>
+      <dd>Sitenin altyapısını sağlayan Cloudflare tarafından güvenlik, kötüye kullanım önleme ve performans amacıyla kısa süreli olarak işlenir. Hukuki sebep: meşru menfaat (KVKK m.5/2-f). Site kendisi IP adresini saklamaz; yükleme sıklığını sınırlamak için IP adresinin geri döndürülemez bir özeti (hash) en fazla bir gün tutulur ve sonra silinir.</dd>
+      <dt>Bot koruması (Cloudflare Turnstile)</dt>
+      <dd>Yükleme formunda, insan olduğunu doğrulamak için Cloudflare Turnstile kullanılır. Turnstile tarayıcı sinyallerini Cloudflare'de değerlendirir ve kısa ömürlü bir doğrulama belirteci üretir; bu işlem için kişisel veri toplanması amaçlanmaz. Ayrıntılar için <a href="https://www.cloudflare.com/privacypolicy/" rel="noopener" target="_blank">Cloudflare gizlilik politikası</a>.</dd>
+      <dt>Görsel dönüştürme</dt>
+      <dd>Yüklenen fotoğraf, boyutlandırma ve WebP formatına çevirme için Cloudflare'in görsel dönüştürme hizmetinden geçer; dönüştürme sırasında kullanılan geçici kopya hemen silinir.</dd>
+    </dl>
+    <p>Kullandığın tarayıcıda çerez bırakmıyoruz. Yönetim paneli yalnızca site yöneticisinin tarayıcısında oturum belleği kullanır. Ziyaret sayıları için Cloudflare Web Analytics kullanılır; çerez bırakmaz, parmak izi çıkarmaz ve kişisel veri toplamaz. Reklam veya sosyal medya izleme kodu yoktur.</p>
+
+    <h2>3. Yükleme kuralları</h2>
+    <ul>
+      <li>Yalnızca sana ait ya da paylaşma hakkına sahip olduğun fotoğrafları yükle.</li>
+      <li>Fotoğrafta tanınabilir kişi (yüz, plaka, adres gibi kişisel veri) olmasın. Bu tür içerikler fark edildiğinde kaldırılır.</li>
+      <li>Kedi tespit edilemeyen yüklemeler saklanmaz; düşük güvenli olanlar yayınlanmadan önce elle incelenir. İnceleme bekleyen fotoğraflar herkese açık değildir, yalnızca site yöneticisi görebilir.</li>
+      <li>Kötüye kullanımı önlemek için yükleme sayısı kişi başına ve site genelinde sınırlıdır.</li>
+    </ul>
+
+    <h2>4. Nerede saklanıyor, kimlerle paylaşılıyor?</h2>
+    <p>Fotoğraflar ve kayıtlar Cloudflare'in (R2 depolama, D1 veritabanı, Workers AI) altyapısında tutulur. Cloudflare sunucuları Türkiye dışında olabilir; bu nedenle yüklediğin fotoğraf KVKK m.9 kapsamında yurt dışına aktarılmış sayılır ve bunu yükleme sırasında verdiğin açık rızaya dayanarak yapıyoruz. Verilerin bunun dışında üçüncü kişilerle paylaşılmaz, satılmaz.</p>
+
+    <h2>5. Ne kadar süre saklanıyor?</h2>
+    <p>Yayınlanan fotoğraflar, silinmesi talep edilene ya da site kapanana kadar saklanır. Reddedilen yüklemeler hemen silinir. Cloudflare'in teknik kayıtları Cloudflare'in kendi saklama süreleriyle sınırlıdır.</p>
+
+    <h2>6. Hakların (KVKK m.11)</h2>
+    <p>Kişisel verilerinin işlenip işlenmediğini öğrenme, işlenmişse bilgi talep etme, amacına uygun kullanılıp kullanılmadığını öğrenme, eksik veya yanlışsa düzeltilmesini isteme, silinmesini veya yok edilmesini isteme, bu işlemlerin aktarıldığı taraflara bildirilmesini isteme ve zarara uğraman hâlinde tazminat talep etme hakkına sahipsin.</p>
+    <p>Bir fotoğrafın kaldırılmasını istiyorsan, fotoğrafın sayfa bağlantısını (ör. <code>turkkedy.net/kedi/123</code>) <a href="https://berk.kim" rel="me noopener" target="_blank">berk.kim</a> üzerinden ilet; en geç 30 gün içinde, genellikle çok daha kısa sürede kaldırılır.</p>
+
+    <h2>7. Değişiklikler</h2>
+    <p>Bu metin gerektiğinde güncellenir; güncel hali her zaman bu adreste yayınlanır.</p>
+
+    <p class="page-foot"><a href="/">← Kedilere dön</a> · miyavlayarak derlendi · <a href="https://berk.kim" rel="me noopener" target="_blank">Berk</a></p>
+  </main>
+</body>
+</html>

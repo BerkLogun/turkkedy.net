@@ -1,59 +1,17 @@
-/// <reference types="@cloudflare/workers-types" />
+import type { Env } from "../../../lib/env";
+import { error, handle, HttpError, json, readJson } from "../../../lib/http";
+import { deleteStmts, getById } from "../../../lib/cats";
+import { pendingKey } from "../../../lib/keys";
 
-interface Env {
-  cats: R2Bucket;
-  ADMIN_TOKEN: string;
-}
-
-export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
-  try {
-    const url = new URL(request.url);
-    const token = url.searchParams.get('token');
-
-    if (!token || token !== env.ADMIN_TOKEN) {
-      return new Response("Unauthorized", { status: 401 });
-    }
-
-    const body = await request.json() as { key?: string };
-    const { key } = body;
-
-    if (!key) {
-      return new Response(JSON.stringify({
-        error: 'Missing key parameter'
-      }), {
-        status: 400,
-        headers: { 'content-type': 'application/json' }
-      });
-    }
-
-    // Verify the image exists before deleting
-    const image = await env.cats.get(key);
-    if (!image) {
-      return new Response(JSON.stringify({
-        error: 'Image not found'
-      }), {
-        status: 404,
-        headers: { 'content-type': 'application/json' }
-      });
-    }
-
-    // Delete the image
-    await env.cats.delete(key);
-
-    return new Response(JSON.stringify({
-      success: true,
-      message: 'Image deleted successfully'
-    }), {
-      headers: { 'content-type': 'application/json' }
-    });
-
-  } catch (error) {
-    console.error('Delete image error:', error);
-    return new Response(JSON.stringify({
-      error: 'Delete failed: ' + (error as Error).message
-    }), {
-      status: 500,
-      headers: { 'content-type': 'application/json' }
-    });
-  }
-};
+/** POST /api/admin/delete { id } — permanently removes a cat (live or pending) from R2 and the index. */
+export const onRequestPost = handle<Env>(async ({ request, env }) => {
+  const body = await readJson<{ id?: number }>(request);
+  const id = Number(body.id);
+  if (!Number.isInteger(id)) throw new HttpError(400, "Missing id");
+  const row = await getById(env.DB, id);
+  if (!row) return error(404, "Not found");
+  if (row.status === "pending") await Promise.all([env.pending.delete(row.key), env.cats.delete(pendingKey(row.key))]);
+  else await env.cats.delete(row.key);
+  await env.DB.batch(deleteStmts(env.DB, row));
+  return json({ ok: true, id });
+});
