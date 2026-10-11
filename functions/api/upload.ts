@@ -6,6 +6,7 @@ import { legacyHash, sha256Hex } from "../../lib/keys";
 import { extensionFor, ImageInfo, mimeFor, sniffImage } from "../../lib/image";
 import { AUTO_LIVE_CONFIDENCE, classifyCat, MIN_PENDING_CONFIDENCE } from "../../lib/classify";
 import { enforceUploadLimit } from "../../lib/ratelimit";
+import { writeSnapshot } from "../../lib/snapshot";
 
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024; // pre-conversion; stored WebP is far smaller
 const FALLBACK_MAX_BYTES = 5 * 1024 * 1024; // when conversion is unavailable and we store the browser output as-is
@@ -48,7 +49,7 @@ async function toWebp(env: Env, input: ArrayBuffer, info: ImageInfo): Promise<{ 
  * Cloudflare Images binding (runs on Cloudflare's image service, not in this worker's CPU budget).
  * Result: { status: "live" | "pending" | "rejected" | "duplicate", id?, key?, pos?, confidence, labels }
  */
-export const onRequestPost = handle<Env>(async ({ request, env }) => {
+export const onRequestPost = handle<Env>(async ({ request, env, waitUntil }) => {
   await enforceUploadLimit(env.DB, request.headers.get("cf-connecting-ip"));
   let form: FormData;
   try {
@@ -112,6 +113,7 @@ export const onRequestPost = handle<Env>(async ({ request, env }) => {
   }).run();
   const row = await getByKey(env.DB, key);
   if (!row) return error(500, "Insert failed");
+  if (status === "live") waitUntil(writeSnapshot(env).catch(() => {}));
 
   return json({
     status,

@@ -2,6 +2,7 @@ import type { Env } from "../../../lib/env";
 import { handle, json } from "../../../lib/http";
 import { batchAll, CatRow, insertStmt } from "../../../lib/cats";
 import { isImageKey, legacyHash, PENDING_PREFIX } from "../../../lib/keys";
+import { writeSnapshot } from "../../../lib/snapshot";
 
 /**
  * POST /api/admin/sync — reconcile the D1 index with what is actually in the R2 bucket.
@@ -109,5 +110,6 @@ export const onRequestPost = handle<Env>(async ({ env }) => {
   report.repacked = fixes.length;
   report.live = live.length;
   report.pending = inR2.size - live.length;
-  return json({ ok: true, ...report });
+  const snapshot = await writeSnapshot(env);
+  return json({ ok: true, ...report, snapshot });
 });

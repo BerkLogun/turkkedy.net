@@ -18,6 +18,8 @@ migrations/        D1 schema
 tools/             bulk tooling (optimize.py, upload_cats.py, seed-from-manifest.mjs)
 ```
 
+**Resilience.** `index.json` in the public bucket is a snapshot of the live list (`lib/snapshot.ts`), rewritten after every upload, approval, delete or sync. The viewer API and cat pages fall back to it when D1 is unavailable, including the free tier's daily read limit (5M rows). Keep batch jobs indexed: an unindexed scan over 4,000 rows per batch is how that limit was hit once.
+
 **Data flow.** The D1 table `cats` is the index: one row per object, with a dense `pos` column (0..N-1) for live cats. The viewer asks for `page = floor(pos / 100)` and reads only that page. Uploads and approvals insert/update rows directly, so nothing needs to be rebuilt. `POST /api/admin/sync` reconciles D1 with the bucket if they ever drift.
 
 **Uploads.** The browser resizes to ≤1600px, stamps the watermark, encodes WebP (JPEG on Safari, which cannot encode WebP) and also sends a 320px JPEG thumbnail. The function sniffs the header; anything that is not already a ≤1600px WebP is converted server-side through Cloudflare Image Transformations (`/cdn-cgi/image/...` on the CDN host, free up to 5,000 unique transformations a month). It then hashes the bytes (the hash is the object key, so duplicates are free), classifies the thumbnail with `@cf/microsoft/resnet-50`, and stores it as live (confidence ≥ 0.5), pending (≥ 0.08) or rejects it. Thresholds live in `lib/classify.ts`.

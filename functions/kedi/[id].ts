@@ -3,6 +3,8 @@ import { cdnBase } from "../../lib/env";
 import { getById, getByPos, liveCount, range } from "../../lib/cats";
 import { renderCatPage } from "../../lib/seo";
 import { SECURITY_HEADERS } from "../../lib/http";
+import { isD1Outage, readSnapshot } from "../../lib/snapshot";
+import type { CatRow } from "../../lib/cats";
 
 /**
  * GET /kedi/:id       — server-rendered page for one cat (canonical URL, indexable).
@@ -30,11 +32,23 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params, w
   const hit = await cache.match(cacheKey);
   if (hit) return hit;
 
-  const cat = await getById(env.DB, id);
-  if (!cat || cat.status !== "live" || cat.pos === null) {
-    return new Response("Not found", { status: 404, headers: { "cache-control": "public, max-age=300" } });
+  let cat: CatRow | null, total: number, strip: Awaited<ReturnType<typeof range>>;
+  try {
+    cat = await getById(env.DB, id);
+    if (!cat || cat.status !== "live" || cat.pos === null) {
+      return new Response("Not found", { status: 404, headers: { "cache-control": "public, max-age=300" } });
+    }
+    [total, strip] = await Promise.all([liveCount(env.DB), range(env.DB, cat.pos - 6, cat.pos + 6)]);
+  } catch (e) {
+    if (!isD1Outage(e)) throw e;
+    // D1 quota/outage: render a caption-less page from the R2 snapshot.
+    const all = await readSnapshot(env);
+    const pos = all.findIndex((it) => it[0] === id);
+    if (pos < 0) return new Response("Not found", { status: 404, headers: { "cache-control": "public, max-age=60" } });
+    cat = { id, key: all[pos][1], status: "live", pos, legacy_hash: null, source: "snapshot", original_name: null, size: null, width: null, height: null, confidence: null, detection: null, uploaded_at: 0, approved_at: null, caption: null, captioned_at: null };
+    total = all.length;
+    strip = all.slice(Math.max(0, pos - 6), pos + 6).map((it, i) => ({ id: it[0], key: it[1], pos: Math.max(0, pos - 6) + i, caption: null, approved_at: null }));
   }
-  const [total, strip] = await Promise.all([liveCount(env.DB), range(env.DB, cat.pos - 6, cat.pos + 6)]);
   const prev = strip.find((s) => s.pos === cat.pos! - 1) ?? null;
   const next = strip.find((s) => s.pos === cat.pos! + 1) ?? null;
 

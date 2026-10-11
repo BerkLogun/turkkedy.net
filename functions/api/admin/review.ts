@@ -3,9 +3,10 @@ import { error, handle, HttpError, json, readJson } from "../../../lib/http";
 import { approveStmt, deleteStmts, getById } from "../../../lib/cats";
 import { pendingKey } from "../../../lib/keys";
 import { mimeForKey } from "../../../lib/image";
+import { writeSnapshot } from "../../../lib/snapshot";
 
 /** POST /api/admin/review { id, action: "approve" | "reject" } — moves a pending cat live, or deletes it. */
-export const onRequestPost = handle<Env>(async ({ request, env }) => {
+export const onRequestPost = handle<Env>(async ({ request, env, waitUntil }) => {
   const body = await readJson<{ id?: number; action?: string }>(request);
   const id = Number(body.id);
   if (!Number.isInteger(id)) throw new HttpError(400, "Missing id");
@@ -27,6 +28,7 @@ export const onRequestPost = handle<Env>(async ({ request, env }) => {
     await approveStmt(env.DB, id, Date.now()).run();
     await Promise.all([env.pending.delete(row.key), env.cats.delete(pendingKey(row.key))]);
     const updated = await getById(env.DB, id);
+    waitUntil(writeSnapshot(env).catch(() => {}));
     return json({ ok: true, id, status: "live", pos: updated?.pos ?? null });
   }
   if (body.action === "reject") {
