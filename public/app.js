@@ -41,7 +41,7 @@ async function itemAt(i) {
 /** Bir sayfadaki tüm kedilerin like durumunu tek batch istekte çeker ve cache'e yazar.
  * D1 okuma kotasını korur: sayfa başına en fazla 1 istek (100 kedi için tek IN sorgusu).
  */
-async function loadLikesForPage(pageNo: number) {
+async function loadLikesForPage(pageNo) {
   try {
     const items = await fetchPage(pageNo);
     const ids = items.map(([id]) => id);
@@ -57,7 +57,7 @@ async function loadLikesForPage(pageNo: number) {
 }
 
 /** Aktif kedi için like butonunu client-side cache'den günceller. */
-function updateLikeButton(id: number) {
+function updateLikeButton(id) {
   if (!state.likeBtn) return;
   const st = state.likeCache.get(id);
   if (!st) return;
