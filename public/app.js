@@ -13,6 +13,7 @@ const state = {
   activeImg: null,
   likeBtn: null,
   likeCount: null,
+  likeCache: new Map(), // id -> { liked, count } — client-side cache, D1 okumasını korur
 };
 
 const imgs = [$("imgA"), $("imgB")];
@@ -37,25 +38,41 @@ async function itemAt(i) {
 
 /* ---------- like ---------- */
 
-/** Sunucudan beğeni durumunu çeker ve butonu günceller. */
-async function loadLike(id) {
-  if (!state.likeBtn) return;
+/** Bir sayfadaki tüm kedilerin like durumunu tek batch istekte çeker ve cache'e yazar.
+ * D1 okuma kotasını korur: sayfa başına en fazla 1 istek (100 kedi için tek IN sorgusu).
+ */
+async function loadLikesForPage(pageNo: number) {
   try {
-    const r = await fetch(`/api/cats/${encodeURIComponent(id)}/like`);
+    const items = await fetchPage(pageNo);
+    const ids = items.map(([id]) => id);
+    const missing = ids.filter((id) => !state.likeCache.has(id));
+    if (missing.length === 0) return;
+    const r = await fetch(`/api/cats/like/batch?ids=${missing.join(",")}`);
     if (!r.ok) return;
     const d = await r.json();
-    state.likeBtn.classList.toggle("liked", !!d.liked);
-    state.likeCount.textContent = d.count > 0 ? d.count : "";
+    for (const [idStr, st] of Object.entries(d)) {
+      state.likeCache.set(Number(idStr), st);
+    }
   } catch { /* silently fail: like is optional */ }
 }
 
-/** Beğeniyi açar/kapar ve butonu günceller. */
+/** Aktif kedi için like butonunu client-side cache'den günceller. */
+function updateLikeButton(id: number) {
+  if (!state.likeBtn) return;
+  const st = state.likeCache.get(id);
+  if (!st) return;
+  state.likeBtn.classList.toggle("liked", !!st.liked);
+  state.likeCount.textContent = st.count > 0 ? st.count : "";
+}
+
+/** Beğeniyi açar/kapar ve butonu + cache'i günceller. */
 async function toggleLikeUI(id) {
   if (!state.likeBtn) return;
   try {
     const r = await fetch(`/api/cats/${encodeURIComponent(id)}/like`, { method: "POST" });
     if (!r.ok) { toast("Beğenilemedi"); return; }
     const d = await r.json();
+    state.likeCache.set(id, { liked: d.liked, count: d.count });
     state.likeBtn.classList.toggle("liked", !!d.liked);
     state.likeCount.textContent = d.count > 0 ? d.count : "";
     toast(d.liked ? "Beğendi 🐾" : "Beğenimi kaldırdın");
@@ -95,7 +112,8 @@ async function show(i, { push = true } = {}) {
   if (!item) { toast("Bu kedi bulunamadı"); return; }
 
   const [id, key] = item;
-  await loadLike(id);
+  await loadLikesForPage(Math.floor(i / PAGE));
+  updateLikeButton(id);
   const next = imgs.find((im) => im !== state.activeImg) || imgs[0];
   setProgress(true);
   next.alt = `kedi #${id}`;
