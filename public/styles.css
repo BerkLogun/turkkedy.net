@@ -287,3 +287,9 @@ body.admin { overflow: auto; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Like butonu (dock) */
+#likeBtn.liked { background: rgba(225, 29, 72, 0.18); }
+#likeBtn.liked .like-icon { fill: #e11d48; }
+#likeCount { font-size: 0.72rem; opacity: 0.75; margin-left: 6px; font-variant-numeric: tabular-nums; }
+#likeBtn.liked #likeCount { opacity: 1; color: #e11d48; font-weight: 600; }

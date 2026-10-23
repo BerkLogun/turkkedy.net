@@ -11,6 +11,8 @@ const state = {
   extra: new Map(),   // pos -> [id, key] for cats added in this session (edge cache may lag)
   loadToken: 0,
   activeImg: null,
+  likeBtn: null,
+  likeCount: null,
 };
 
 const imgs = [$("imgA"), $("imgB")];
@@ -31,6 +33,33 @@ async function itemAt(i) {
   if (state.extra.has(i)) return state.extra.get(i);
   const items = await fetchPage(Math.floor(i / PAGE));
   return items[i % PAGE] || null;
+}
+
+/* ---------- like ---------- */
+
+/** Sunucudan beğeni durumunu çeker ve butonu günceller. */
+async function loadLike(id) {
+  if (!state.likeBtn) return;
+  try {
+    const r = await fetch(`/api/cats/${encodeURIComponent(id)}/like`);
+    if (!r.ok) return;
+    const d = await r.json();
+    state.likeBtn.classList.toggle("liked", !!d.liked);
+    state.likeCount.textContent = d.count > 0 ? d.count : "";
+  } catch { /* silently fail: like is optional */ }
+}
+
+/** Beğeniyi açar/kapar ve butonu günceller. */
+async function toggleLikeUI(id) {
+  if (!state.likeBtn) return;
+  try {
+    const r = await fetch(`/api/cats/${encodeURIComponent(id)}/like`, { method: "POST" });
+    if (!r.ok) { toast("Beğenilemedi"); return; }
+    const d = await r.json();
+    state.likeBtn.classList.toggle("liked", !!d.liked);
+    state.likeCount.textContent = d.count > 0 ? d.count : "";
+    toast(d.liked ? "Beğendi 🐾" : "Beğenimi kaldırdın");
+  } catch { toast("Beğenilemedi"); }
 }
 const urlFor = (key) => `${state.cdn}/${encodeURI(key)}`;
 
@@ -66,6 +95,7 @@ async function show(i, { push = true } = {}) {
   if (!item) { toast("Bu kedi bulunamadı"); return; }
 
   const [id, key] = item;
+  await loadLike(id);
   const next = imgs.find((im) => im !== state.activeImg) || imgs[0];
   setProgress(true);
   next.alt = `kedi #${id}`;
@@ -145,6 +175,12 @@ async function openUpload() {
 }
 
 /* ---------- input ---------- */
+state.likeBtn = $("likeBtn");
+state.likeCount = $("likeCount");
+state.likeBtn.addEventListener("click", () => {
+  const id = state.activeImg?.dataset.id;
+  if (id) toggleLikeUI(Number(id));
+});
 $("prevBtn").addEventListener("click", prevCat);
 $("nextBtn").addEventListener("click", nextCat);
 $("randBtn").addEventListener("click", randomCat);
@@ -161,6 +197,7 @@ window.addEventListener("keydown", (e) => {
   else if (k === "r") randomCat();
   else if (k === "s") share();
   else if (k === "u") openUpload();
+  else if (k === "b") { const id = state.activeImg?.dataset.id; if (id) toggleLikeUI(Number(id)); }
   else return;
   e.preventDefault();
 });
