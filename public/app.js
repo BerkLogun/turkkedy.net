@@ -11,6 +11,9 @@ const state = {
   extra: new Map(),   // pos -> [id, key] for cats added in this session (edge cache may lag)
   loadToken: 0,
   activeImg: null,
+  likeBtn: null,
+  likeCount: null,
+  likeCache: new Map(), // id -> { liked, count } — client-side cache, D1 okumasını korur
 };
 
 const imgs = [$("imgA"), $("imgB")];
@@ -31,6 +34,49 @@ async function itemAt(i) {
   if (state.extra.has(i)) return state.extra.get(i);
   const items = await fetchPage(Math.floor(i / PAGE));
   return items[i % PAGE] || null;
+}
+
+/* ---------- like ---------- */
+
+/** Bir sayfadaki tüm kedilerin like durumunu tek batch istekte çeker ve cache'e yazar.
+ * D1 okuma kotasını korur: sayfa başına en fazla 1 istek (100 kedi için tek IN sorgusu).
+ */
+async function loadLikesForPage(pageNo) {
+  try {
+    const items = await fetchPage(pageNo);
+    const ids = items.map(([id]) => id);
+    const missing = ids.filter((id) => !state.likeCache.has(id));
+    if (missing.length === 0) return;
+    const r = await fetch(`/api/cats/like/batch?ids=${missing.join(",")}`);
+    if (!r.ok) return;
+    const d = await r.json();
+    for (const [idStr, st] of Object.entries(d)) {
+      state.likeCache.set(Number(idStr), st);
+    }
+  } catch { /* silently fail: like is optional */ }
+}
+
+/** Aktif kedi için like butonunu client-side cache'den günceller. */
+function updateLikeButton(id) {
+  if (!state.likeBtn) return;
+  const st = state.likeCache.get(id);
+  if (!st) return;
+  state.likeBtn.classList.toggle("liked", !!st.liked);
+  state.likeCount.textContent = st.count > 0 ? st.count : "";
+}
+
+/** Beğeniyi açar/kapar ve butonu + cache'i günceller. */
+async function toggleLikeUI(id) {
+  if (!state.likeBtn) return;
+  try {
+    const r = await fetch(`/api/cats/${encodeURIComponent(id)}/like`, { method: "POST" });
+    if (!r.ok) { toast("Beğenilemedi"); return; }
+    const d = await r.json();
+    state.likeCache.set(id, { liked: d.liked, count: d.count });
+    state.likeBtn.classList.toggle("liked", !!d.liked);
+    state.likeCount.textContent = d.count > 0 ? d.count : "";
+    toast(d.liked ? "Beğendi 🐾" : "Beğenimi kaldırdın");
+  } catch { toast("Beğenilemedi"); }
 }
 const urlFor = (key) => `${state.cdn}/${encodeURI(key)}`;
 
@@ -66,6 +112,8 @@ async function show(i, { push = true } = {}) {
   if (!item) { toast("Bu kedi bulunamadı"); return; }
 
   const [id, key] = item;
+  await loadLikesForPage(Math.floor(i / PAGE));
+  updateLikeButton(id);
   const next = imgs.find((im) => im !== state.activeImg) || imgs[0];
   setProgress(true);
   next.alt = `kedi #${id}`;
@@ -145,6 +193,12 @@ async function openUpload() {
 }
 
 /* ---------- input ---------- */
+state.likeBtn = $("likeBtn");
+state.likeCount = $("likeCount");
+state.likeBtn.addEventListener("click", () => {
+  const id = state.activeImg?.dataset.id;
+  if (id) toggleLikeUI(Number(id));
+});
 $("prevBtn").addEventListener("click", prevCat);
 $("nextBtn").addEventListener("click", nextCat);
 $("randBtn").addEventListener("click", randomCat);
@@ -161,6 +215,7 @@ window.addEventListener("keydown", (e) => {
   else if (k === "r") randomCat();
   else if (k === "s") share();
   else if (k === "u") openUpload();
+  else if (k === "b") { const id = state.activeImg?.dataset.id; if (id) toggleLikeUI(Number(id)); }
   else return;
   e.preventDefault();
 });
