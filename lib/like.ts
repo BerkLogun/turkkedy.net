@@ -66,8 +66,12 @@ export async function toggleLike(db: D1Database, catId: number, deviceHash: stri
   return { liked, count };
 }
 
-/** Birden çok kedi için like durumu ve toplam sayıyı tek sorguda çeker.
- * D1 okuma kotasını korumak için sayfa başına tek istek yeterlidir.
+/** D1 prepared statement sınırı (en fazla 99 binding). */
+const MAX_BIND = 99;
+
+/** Birden çok kedi için like durumu ve toplam sayıyı çeker.
+ * ID'leri 99'luk parçalara böler (D1 binding sınırı), her parçayı ayrı sorgular ve sonuçları birleştirir.
+ * D1 okuma kotasını korumak için sayfa başına tek batch istek yeterlidir.
  */
 export async function getLikeStatuses(
   db: D1Database,
@@ -77,27 +81,30 @@ export async function getLikeStatuses(
   const result = new Map<number, LikeStatus>();
   if (catIds.length === 0) return result;
 
-  // Her ID için ayrı binding (D1 prepared statement sınırı içinde olur, sayfa = 100)
-  const placeholders = catIds.map((_, i) => `?${i + 1}`).join(",");
-  const deviceParam = `?${catIds.length + 1}`;
-
-  // Toplam beğeni sayıları
-  const countSql = `SELECT cat_id, COUNT(*) AS cnt FROM likes WHERE cat_id IN (${placeholders}) GROUP BY cat_id`;
-  const countRows = await db
-    .prepare(countSql)
-    .bind(...catIds)
-    .all<{ cat_id: number; cnt: number }>();
   const counts = new Map<number, number>();
-  for (const r of countRows.results ?? []) counts.set(r.cat_id, r.cnt);
-
-  // Bu cihazın zaten beğendiği kediler
-  const mySql = `SELECT cat_id FROM likes WHERE cat_id IN (${placeholders}) AND device_hash = ${deviceParam}`;
-  const myRows = await db
-    .prepare(mySql)
-    .bind(...catIds, deviceHash)
-    .all<{ cat_id: number }>();
   const myLiked = new Set<number>();
-  for (const r of myRows.results ?? []) myLiked.add(r.cat_id);
+
+  for (let start = 0; start < catIds.length; start += MAX_BIND) {
+    const chunk = catIds.slice(start, start + MAX_BIND);
+    const placeholders = chunk.map((_, i) => `?${i + 1}`).join(",");
+
+    // Toplam beğeni sayıları (bu parça için)
+    const countSql = `SELECT cat_id, COUNT(*) AS cnt FROM likes WHERE cat_id IN (${placeholders}) GROUP BY cat_id`;
+    const countRows = await db
+      .prepare(countSql)
+      .bind(...chunk)
+      .all<{ cat_id: number; cnt: number }>();
+    for (const r of countRows.results ?? []) counts.set(r.cat_id, r.cnt);
+
+    // Bu cihazın zaten beğendiği kediler (bu parça için)
+    const deviceParam = `?${chunk.length + 1}`;
+    const mySql = `SELECT cat_id FROM likes WHERE cat_id IN (${placeholders}) AND device_hash = ${deviceParam}`;
+    const myRows = await db
+      .prepare(mySql)
+      .bind(...chunk, deviceHash)
+      .all<{ cat_id: number }>();
+    for (const r of myRows.results ?? []) myLiked.add(r.cat_id);
+  }
 
   for (const id of catIds) {
     result.set(id, { liked: myLiked.has(id), count: counts.get(id) ?? 0 });
